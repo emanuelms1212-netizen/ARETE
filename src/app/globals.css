@@ -1,0 +1,101 @@
+@import 'tailwindcss';
+
+/*
+ * ARETE design tokens.
+ *
+ * Restraint is the brief: one accent, low chroma, generous space, no gradients,
+ * no shadows doing decorative work. Light and dark are both first-class; the
+ * dark palette is not an inversion but its own set of values.
+ */
+@theme {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'Noto Sans', sans-serif;
+
+  --color-canvas: #f6f5f2;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #efeeea;
+  --color-ink: #1b1f24;
+  --color-ink-muted: #5b6570;
+  --color-line: #e2dfd8;
+  --color-accent: #3d6d62;
+  --color-accent-soft: #dfeae6;
+  --color-warn: #8a5a2b;
+
+  --radius-card: 0.875rem;
+}
+
+:root {
+  color-scheme: light;
+  --canvas: var(--color-canvas);
+  --surface: var(--color-surface);
+  --surface-sunken: var(--color-surface-sunken);
+  --ink: var(--color-ink);
+  --ink-muted: var(--color-ink-muted);
+  --line: var(--color-line);
+  --accent: var(--color-accent);
+  --accent-soft: var(--color-accent-soft);
+  --warn: var(--color-warn);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --canvas: #0d1015;
+    --surface: #141920;
+    --surface-sunken: #10141a;
+    --ink: #e7eaee;
+    --ink-muted: #98a1ac;
+    --line: #232a33;
+    --accent: #82b4a7;
+    --accent-soft: #1b2a28;
+    --warn: #d0a06a;
+  }
+}
+
+* {
+  border-color: var(--line);
+}
+
+html {
+  background-color: var(--canvas);
+}
+
+body {
+  background-color: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  min-height: 100dvh;
+}
+
+/* Visible, consistent focus. Never removed. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Safe-area helpers for notched devices. */
+.pt-safe {
+  padding-top: max(0.75rem, env(safe-area-inset-top));
+}
+.pb-safe {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+.px-safe {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

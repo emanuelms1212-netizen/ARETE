@@ -1,5 +1,34 @@
+# dependencies
 node_modules/
-.env
-.DS_Store
-dist/
+.pnp
+.pnp.js
+
+# testing
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
+# next.js
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# production
 build/
+dist/
+
+# environment
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# misc
+.DS_Store
+*.pem
+.vercel
+.idea/
+.vscode/
