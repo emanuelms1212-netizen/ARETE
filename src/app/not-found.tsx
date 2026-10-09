@@ -11,7 +11,7 @@ export default function NotFound() {
           action={
             <Link
               href="/today"
-              className="inline-flex min-h-11 items-center rounded-full bg-[var(--accent)] px-5 text-sm font-medium text-[var(--canvas)]"
+              className="inline-flex min-h-11 items-center rounded-full bg-accent px-5 text-body font-medium text-on-accent"
             >
               Back to Today
             </Link>

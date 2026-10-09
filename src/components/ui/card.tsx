@@ -1,19 +1,23 @@
-import type { ComponentProps, ReactNode } from 'react';
+import type { ComponentProps } from 'react';
 
-export function Card({ className = '', ...props }: ComponentProps<'section'>) {
-  return (
-    <section
-      className={`rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-4 ${className}`}
-      {...props}
-    />
-  );
+type Tone = 'surface' | 'sunken';
+
+const tones: Record<Tone, string> = {
+  surface: 'bg-surface',
+  sunken: 'bg-sunken',
+};
+
+export interface CardProps extends ComponentProps<'div'> {
+  readonly tone?: Tone;
+  /** Cards do not float by default. Only overlays and sheets earn a shadow. */
+  readonly raised?: boolean;
 }
 
-export function CardHeader({ title, hint }: { title: ReactNode; hint?: ReactNode }) {
+export function Card({ tone = 'surface', raised = false, className = '', ...props }: CardProps) {
   return (
-    <header className="mb-3">
-      <h2 className="text-sm font-semibold tracking-wide text-[var(--ink)] uppercase">{title}</h2>
-      {hint ? <p className="mt-1 text-sm text-[var(--ink-muted)]">{hint}</p> : null}
-    </header>
+    <div
+      className={`rounded-lg border border-line ${tones[tone]} ${raised ? 'shadow-raised' : ''} ${className}`}
+      {...props}
+    />
   );
 }

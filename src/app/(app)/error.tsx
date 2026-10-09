@@ -10,7 +10,7 @@ export default function AppError({ error, reset }: { error: Error; reset: () => 
         <>
           <p>Nothing you recorded has been lost.</p>
           {process.env.NODE_ENV !== 'production' ? (
-            <p className="mt-2 font-mono text-xs break-words">{error.message}</p>
+            <p className="mt-2 font-mono text-label break-words">{error.message}</p>
           ) : null}
         </>
       }

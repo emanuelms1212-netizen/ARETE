@@ -27,7 +27,7 @@ export function OfflineBanner() {
   return (
     <div role="status" aria-live="polite">
       {isOffline ? (
-        <p className="border-b border-[var(--line)] bg-[var(--surface-sunken)] px-4 py-2 text-center text-xs text-[var(--ink-muted)]">
+        <p className="border-b border-line bg-sunken px-4 py-2 text-center text-body-sm text-ink-muted">
           Offline. You can read what is already loaded; saving is paused until you reconnect.
         </p>
       ) : null}

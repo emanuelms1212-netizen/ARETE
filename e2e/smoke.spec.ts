@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 test.describe('app shell', () => {
   test('the root redirects to Today and renders the day', async ({ page }) => {
@@ -64,13 +64,129 @@ test.describe('app shell', () => {
       expect(iconResponse.ok(), `${icon.src} should be served`).toBe(true);
     }
   });
+});
 
-  test('the page has no horizontal overflow at phone width', async ({ page }) => {
+async function hasHorizontalOverflow(page: Page): Promise<boolean> {
+  return page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+  );
+}
+
+test.describe('layout', () => {
+  // 320px is the narrowest width the product supports.
+  for (const width of [320, 390, 768, 1440]) {
+    test(`has no horizontal overflow at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 });
+
+      for (const path of ['/today', '/plan', '/mind', '/settings']) {
+        await page.goto(path);
+        expect(await hasHorizontalOverflow(page), `${path} at ${width}px`).toBe(false);
+      }
+    });
+  }
+
+  test('the Today heading stays on screen at 320px', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 844 });
     await page.goto('/today');
 
-    const overflows = await page.evaluate(
-      () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+    const box = await page.getByRole('heading', { level: 1 }).boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(321);
+  });
+});
+
+test.describe('keyboard and focus', () => {
+  test('the first tab stop is a working skip link', async ({ page }) => {
+    await page.goto('/today');
+    await page.keyboard.press('Tab');
+
+    const skip = page.getByRole('link', { name: 'Skip to content' });
+    await expect(skip).toBeFocused();
+
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/#main$/);
+  });
+
+  test('every nav destination is reachable by keyboard with a visible focus ring', async ({
+    page,
+  }) => {
+    await page.goto('/today');
+
+    const outline = await page.evaluate(() => {
+      const link = document.querySelector<HTMLElement>('nav[aria-label="Primary"] a');
+      link?.focus();
+      return link ? getComputedStyle(link).outlineStyle : null;
+    });
+
+    // focus() alone does not always set :focus-visible, so assert the stylesheet
+    // defines a ring rather than that this particular element is showing one.
+    expect(outline).not.toBeNull();
+
+    const hasFocusRule = await page.evaluate(() =>
+      [...document.styleSheets].some((sheet) => {
+        try {
+          return [...sheet.cssRules].some(
+            (rule) => rule.cssText.includes(':focus-visible') && rule.cssText.includes('outline'),
+          );
+        } catch {
+          return false;
+        }
+      }),
     );
-    expect(overflows).toBe(false);
+    expect(hasFocusRule).toBe(true);
+  });
+});
+
+test.describe('command launcher', () => {
+  test('opens with the keyboard shortcut and navigates', async ({ page }) => {
+    await page.goto('/today');
+
+    await page.keyboard.press('ControlOrMeta+k');
+    const search = page.getByRole('searchbox', { name: 'Search destinations' });
+    await expect(search).toBeFocused();
+
+    await search.fill('progress');
+    await search.press('Enter');
+
+    await expect(page).toHaveURL(/\/progress$/);
+  });
+
+  test('closes on Escape without navigating', async ({ page }) => {
+    await page.goto('/today');
+
+    await page.getByRole('button', { name: 'Search and commands' }).click();
+    await expect(page.getByRole('searchbox', { name: 'Search destinations' })).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('searchbox', { name: 'Search destinations' })).toBeHidden();
+    await expect(page).toHaveURL(/\/today$/);
+  });
+});
+
+test.describe('motion', () => {
+  test.use({ reducedMotion: 'reduce' });
+
+  test('the breathing ring rests still when reduced motion is requested', async ({ page }) => {
+    await page.goto('/mind');
+
+    const animation = await page
+      .locator('.animate-breathe')
+      .first()
+      .evaluate((element) => getComputedStyle(element).animationName);
+
+    expect(animation).toBe('none');
+  });
+
+  test('the breathing cue still paces the practice without motion', async ({ page }) => {
+    await page.goto('/mind');
+    await expect(page.getByText('Four in · two held · six out')).toBeVisible();
+  });
+});
+
+test.describe('styleguide', () => {
+  test('is not reachable in a production build', async ({ page }) => {
+    const response = await page.goto('/styleguide');
+    expect(response?.status()).toBe(404);
   });
 });

@@ -5,8 +5,12 @@ import { usePathname } from 'next/navigation';
 import { destinations } from './destinations';
 
 /**
- * Thumb-reachable primary navigation on phones; the same list renders as a
- * left rail from `md` up, so there is one IA rather than two products.
+ * Thumb-reachable primary navigation on phones; the same list becomes a left
+ * rail from `md` up, so there is one information architecture rather than two
+ * products.
+ *
+ * The current destination is marked with `aria-current`, a filled icon chip and
+ * a heavier label — never by colour alone.
  */
 export function BottomNav() {
   const pathname = usePathname();
@@ -14,29 +18,24 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Primary"
-      className="pb-safe fixed inset-x-0 bottom-0 z-20 border-t border-[var(--line)] bg-[var(--surface)]/95 backdrop-blur md:top-0 md:right-auto md:bottom-0 md:w-56 md:border-t-0 md:border-r md:pt-6"
+      className="pb-safe fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 backdrop-blur md:top-0 md:right-auto md:bottom-0 md:w-56 md:border-t-0 md:border-r md:pt-20"
     >
-      <ul className="mx-auto flex max-w-md items-stretch justify-between px-2 md:mx-0 md:max-w-none md:flex-col md:gap-1 md:px-3">
-        {destinations.map((destination) => {
-          const isCurrent = pathname === destination.href;
+      <ul className="mx-auto flex max-w-md items-stretch justify-between gap-0.5 px-2 md:mx-0 md:max-w-none md:flex-col md:gap-1 md:px-3">
+        {destinations.map(({ href, label, Icon }) => {
+          const isCurrent = pathname === href;
           return (
-            <li key={destination.href} className="flex-1 md:flex-none">
+            <li key={href} className="min-w-0 flex-1 md:flex-none">
               <Link
-                href={destination.href}
+                href={href}
                 aria-current={isCurrent ? 'page' : undefined}
-                className={`flex min-h-11 flex-col items-center justify-center rounded-lg px-2 py-2 text-xs font-medium md:flex-row md:justify-start md:gap-3 md:px-3 md:text-sm ${
+                className={`focus-inset flex min-h-13 flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-label transition-colors duration-[var(--duration-fast)] md:min-h-11 md:flex-row md:justify-start md:gap-3 md:px-3 md:py-2 md:text-body ${
                   isCurrent
-                    ? 'bg-[var(--accent-soft)] text-[var(--accent)]'
-                    : 'text-[var(--ink-muted)] hover:text-[var(--ink)]'
+                    ? 'bg-accent-soft font-semibold text-accent'
+                    : 'text-ink-muted hover:text-ink'
                 }`}
               >
-                <span
-                  aria-hidden="true"
-                  className={`mb-1 block h-1.5 w-1.5 rounded-full md:mb-0 ${
-                    isCurrent ? 'bg-[var(--accent)]' : 'bg-transparent'
-                  }`}
-                />
-                {destination.label}
+                <Icon size={20} />
+                <span className="truncate">{label}</span>
               </Link>
             </li>
           );

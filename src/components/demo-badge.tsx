@@ -8,7 +8,7 @@ export function DemoBadge() {
   if (!isDemoMode) return null;
 
   return (
-    <p className="rounded-full border border-[var(--line)] px-3 py-1 text-xs text-[var(--ink-muted)]">
+    <p className="inline-block rounded-full border border-line-strong px-3 py-1 text-label text-ink-muted">
       Demo data — deterministic sample, not your account
     </p>
   );

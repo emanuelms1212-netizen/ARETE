@@ -7,6 +7,6 @@ export const appConfig = {
   tagline: 'One calm system for the day.',
   description:
     'A calm personal operating system for habits, goals, focus, mind, nutrition, mobility and adaptive training.',
-  themeColor: '#12161c',
-  backgroundColor: '#0d1015',
+  themeColor: '#14151a',
+  backgroundColor: '#14151a',
 } as const;

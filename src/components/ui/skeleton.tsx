@@ -1,15 +1,17 @@
 import type { ComponentProps } from 'react';
 
 /**
- * The single loading primitive. Every loading state in the app is built from
- * these, so loading never appears as a spinner in one place and a bar in
- * another.
+ * The single loading primitive. Every loading state is built from these, so
+ * loading never appears as a spinner in one place and a bar in another.
+ *
+ * The pulse uses the breathing easing rather than a linear shimmer, and it
+ * stops entirely under `prefers-reduced-motion`.
  */
 export function Skeleton({ className = '', ...props }: ComponentProps<'div'>) {
   return (
     <div
       aria-hidden="true"
-      className={`animate-pulse rounded-md bg-[var(--surface-sunken)] ${className}`}
+      className={`animate-skeleton rounded-md bg-sunken ${className}`}
       {...props}
     />
   );

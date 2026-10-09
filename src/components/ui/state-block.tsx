@@ -17,15 +17,11 @@ interface StateBlockProps {
 export function StateBlock({ title, body, action, tone = 'neutral' }: StateBlockProps) {
   return (
     <div
-      className="rounded-[var(--radius-card)] border border-dashed border-[var(--line)] px-4 py-8 text-center"
+      className="rounded-lg border border-dashed border-line px-4 py-8 text-center"
       role={tone === 'warn' ? 'alert' : undefined}
     >
-      <p
-        className={`text-base font-medium ${tone === 'warn' ? 'text-[var(--warn)]' : 'text-[var(--ink)]'}`}
-      >
-        {title}
-      </p>
-      {body ? <div className="mt-2 text-sm text-[var(--ink-muted)]">{body}</div> : null}
+      <p className={`text-body-lg ${tone === 'warn' ? 'text-warn' : 'text-ink'}`}>{title}</p>
+      {body ? <div className="mt-2 text-body-sm text-ink-muted">{body}</div> : null}
       {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
     </div>
   );

@@ -2,7 +2,8 @@
 
 /**
  * Last-resort boundary. It replaces the root layout, so it renders its own
- * html/body and cannot rely on any app styling being present.
+ * html/body and cannot rely on any app styling — not even the token sheet —
+ * being present. The colours here are the light palette, inlined on purpose.
  */
 export default function GlobalError({ reset }: { error: Error; reset: () => void }) {
   return (
@@ -14,13 +15,13 @@ export default function GlobalError({ reset }: { error: Error; reset: () => void
           minHeight: '100dvh',
           display: 'grid',
           placeItems: 'center',
-          background: '#f6f5f2',
-          color: '#1b1f24',
+          background: '#f4f1ea',
+          color: '#1b1a17',
         }}
       >
         <main style={{ maxWidth: '28rem', padding: '2rem', textAlign: 'center' }}>
-          <h1 style={{ fontSize: '1.125rem', margin: 0 }}>ARETE could not start.</h1>
-          <p style={{ color: '#5b6570', marginTop: '0.75rem' }}>
+          <h1 style={{ fontSize: '1.25rem', margin: 0 }}>ARETE could not start.</h1>
+          <p style={{ color: '#5c584e', marginTop: '0.75rem', lineHeight: 1.6 }}>
             Nothing you recorded has been lost. Try again, and if this keeps happening the version
             details are at <code>/api/health</code>.
           </p>
@@ -33,9 +34,9 @@ export default function GlobalError({ reset }: { error: Error; reset: () => void
               padding: '0 1.25rem',
               borderRadius: '999px',
               border: 'none',
-              background: '#3d6d62',
-              color: '#f6f5f2',
-              fontSize: '0.875rem',
+              background: '#8a5423',
+              color: '#f4f1ea',
+              fontSize: '0.9375rem',
               cursor: 'pointer',
             }}
           >

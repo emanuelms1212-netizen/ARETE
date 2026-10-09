@@ -12,12 +12,15 @@ Working title. Renaming is a one-line change in `src/lib/app-config.ts`.
 
 ## Status
 
-**Stage 2 of 17 — technical foundation.** The app shell runs, the layers exist, and the
-quality gates pass. The product modules are not built yet: Plan, Train, Mind and Progress
-render an honest "not built yet" state naming the stage that builds them, rather than
-buttons that do nothing.
+**Stage 3 of 17 — design system and application shell.** The app looks like the product
+now: tokens, type, the component library, the navigation shell, a command launcher, and a
+complete Today screen on demo data. The product modules are still not built — Plan, Train
+and Progress render an honest "not built yet" state naming the stage that builds them,
+rather than buttons that do nothing. Two things that do work are shown working and
+labelled: the focus timer on Today, and the breathing pacer on Mind.
 
-See `docs/PROJECT_LEDGER.md` for where the build actually stands and what comes next.
+See `docs/PROJECT_LEDGER.md` for where the build actually stands and what comes next, and
+`docs/DESIGN_SYSTEM.md` for the visual system.
 
 ## Requirements
 
@@ -60,7 +63,8 @@ exists in stage 4, rather than quietly serving sample data as if it were real.
 ```
 src/
   app/            Next.js App Router — routes, layouts, loading/error/not-found
-  components/     UI primitives and navigation. No data fetching, no vendor SDKs
+  components/     UI primitives, icons and navigation. No data fetching, no vendor SDKs
+  design/         Design tokens and WCAG contrast maths. Pure data; the tests assert it
   domain/         Types and pure logic. Knows nothing about React or any database
   persistence/    Repository interfaces + the demo adapter. The only layer a database touches
   content/        Content packs as validated data, each carrying provenance
@@ -88,7 +92,11 @@ database client, and the domain layer never imports React.
 ## Principles this codebase is held to
 
 - **No fake anything.** No mock buttons, no dead links, no writes that vanish, no silent
-  failures. A feature that is not built says so.
+  failures. A feature that is not built says so. A list row is pressable only when it has
+  somewhere to go.
+- **Accessibility claims are computed, not asserted.** Every colour pair the product
+  renders is checked against WCAG AA in the test suite, and the stylesheet is parsed and
+  compared against the token source so the two cannot drift.
 - **Calm and non-shaming.** A missed day is quiet, not red. The word "streak" does not
   appear in copy about a missed day — there is a test for that.
 - **Health features are self-management tools**, not diagnosis or treatment. Cold exposure
