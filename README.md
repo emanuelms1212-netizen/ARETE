@@ -12,14 +12,18 @@ Working title. Renaming is a one-line change in `src/lib/app-config.ts`.
 
 ## Status
 
-**Stage 3 of 17 — design system and application shell.** The app looks like the product
-now: tokens, type, the component library, the navigation shell, a command launcher, and a
-complete Today screen on demo data. The product modules are still not built — Plan, Train
-and Progress render an honest "not built yet" state naming the stage that builds them,
-rather than buttons that do nothing. Two things that do work are shown working and
-labelled: the focus timer on Today, and the breathing pacer on Mind.
+**Stage 4 of 17 — data model, authentication and persistence.** There is a real schema
+now: 37 tables, row-level security on every one of them, and an authorization test suite
+that runs against a real Postgres and actually tries to read another user's data. The app
+reads the signed-in user's own local day through a repository interface with two
+interchangeable implementations.
 
-See `docs/PROJECT_LEDGER.md` for where the build actually stands and what comes next, and
+The product modules are still not built — Plan, Train and Progress render an honest "not
+built yet" state naming the stage that builds them. Two things that do work are shown
+working and labelled: the focus timer on Today, and the breathing pacer on Mind.
+
+See `docs/PROJECT_LEDGER.md` for where the build stands and what comes next,
+`docs/DATA_MODEL.md` for the schema and the reasoning behind it, and
 `docs/DESIGN_SYSTEM.md` for the visual system.
 
 ## Requirements
@@ -35,12 +39,14 @@ cp .env.example .env.local   # optional: the defaults already work
 npm run dev                  # http://localhost:3000 -> /today
 ```
 
-No credentials are needed. The app runs in **demo mode** by default, reading a fixed,
-deterministic sample through the same repository interface that real data will use. The
-UI labels it as demo data; it is never presented as the user's own.
+No credentials are needed. The app runs in **demo mode** by default: a fixed, deterministic
+account served through the same repository interface real data uses, with writes that work
+and last until the server restarts. The UI says so; it is never presented as durable.
 
-`NEXT_PUBLIC_APP_MODE=live` deliberately **fails to start** until the Supabase adapter
-exists in stage 4, rather than quietly serving sample data as if it were real.
+For **live mode** you need a Supabase project and three environment variables — see
+`docs/PROJECT_LEDGER.md` §8 for the twenty-minute setup. ARETE refuses to start in live mode
+half-configured, and names what is missing, rather than quietly serving demo data as if it
+were the account.
 
 ## Commands
 
@@ -52,11 +58,17 @@ exists in stage 4, rather than quietly serving sample data as if it were real.
 | `npm run lint`                    | ESLint (flat config, `eslint-config-next`)         |
 | `npm run format` / `format:check` | Prettier                                           |
 | `npm run typecheck`               | `tsc --noEmit`, strict                             |
-| `npm test`                        | Vitest unit and component tests                    |
+| `npm test`                        | Vitest unit, component and database tests          |
 | `npm run test:coverage`           | Vitest with V8 coverage                            |
 | `npm run e2e`                     | Playwright smoke tests at phone and desktop widths |
 | `npm run e2e:install`             | Install the Chromium browser Playwright needs      |
+| `npm run db:migrate`              | Apply every migration, in order, from zero         |
+| `npm run db:seed`                 | Content; plus the demo account outside production  |
+| `npm run db:reset`                | Both                                               |
 | `npm run verify`                  | Everything CI runs, in order                       |
+
+The database commands read `SUPABASE_DB_URL`, the service-role connection string. They
+are deployment work and never run on the request path.
 
 ## Architecture
 
@@ -65,8 +77,12 @@ src/
   app/            Next.js App Router — routes, layouts, loading/error/not-found
   components/     UI primitives, icons and navigation. No data fetching, no vendor SDKs
   design/         Design tokens and WCAG contrast maths. Pure data; the tests assert it
-  domain/         Types and pure logic. Knows nothing about React or any database
-  persistence/    Repository interfaces + the demo adapter. The only layer a database touches
+  domain/         Types, local days, recurrence, units, idempotency. No React, no database
+  auth/           Who is this? Demo identity, or a Supabase session
+  persistence/    Repository interface, demo adapter, SQL adapter. The only layer SQL touches
+supabase/
+  migrations/     The schema: 37 tables, row-level security on all of them
+  test/           An auth-schema stand-in, for the tests only. Never applied to a real database
   content/        Content packs as validated data, each carrying provenance
   analytics/      Typed events and a no-op sink. No free text ever leaves the device
   integrations/   External services, each behind an interface. Currently empty by design
@@ -97,6 +113,11 @@ database client, and the domain layer never imports React.
 - **Accessibility claims are computed, not asserted.** Every colour pair the product
   renders is checked against WCAG AA in the test suite, and the stylesheet is parsed and
   compared against the token source so the two cannot drift.
+- **Security claims are tried, not stated.** The authorization tests run against a real
+  Postgres and attempt to read, forge, update and delete another user's rows.
+- **Rules that can be constraints are constraints.** No analytics event can hold free text,
+  no quote can carry an unverified author, no skip can lack a reason — enforced in the
+  database, where application code cannot forget.
 - **Calm and non-shaming.** A missed day is quiet, not red. The word "streak" does not
   appear in copy about a missed day — there is a test for that.
 - **Health features are self-management tools**, not diagnosis or treatment. Cold exposure

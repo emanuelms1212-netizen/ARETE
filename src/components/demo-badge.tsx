@@ -9,7 +9,7 @@ export function DemoBadge() {
 
   return (
     <p className="inline-block rounded-full border border-line-strong px-3 py-1 text-label text-ink-muted">
-      Demo data — deterministic sample, not your account
+      Demo data — changes last until the server restarts
     </p>
   );
 }

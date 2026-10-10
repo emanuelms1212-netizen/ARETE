@@ -11,6 +11,9 @@ import type { Day } from '@/domain';
  * a reason, and a quiet day — because those are the states the design has to
  * survive, not the perfect day.
  */
+/** The demo account. A real uuid so demo and live code paths look identical. */
+export const DEMO_USER_ID = '00000000-0000-4000-8000-000000000001';
+
 export const DEMO_TODAY = '2026-03-16';
 
 export const demoDays: readonly Day[] = [

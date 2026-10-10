@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { getCurrentUser } from '@/auth';
 import { DemoBadge } from '@/components/demo-badge';
 import {
   Card,
@@ -13,13 +14,21 @@ import {
 import {
   computeDayProgress,
   describeDay,
+  toLocalDate,
   type Commitment,
   type Day,
   type DayProgress,
 } from '@/domain';
-import { DEMO_TODAY, getDayRepository } from '@/persistence';
+import { DEMO_TODAY, withUser } from '@/persistence';
 
 export const metadata: Metadata = { title: 'Today' };
+
+/**
+ * Today is the user's own day, read per request. Prerendering it would bake one
+ * account's data into the build — harmless in demo mode and wrong in live mode,
+ * so it is dynamic in both rather than depending on which mode built it.
+ */
+export const dynamic = 'force-dynamic';
 
 const statusLabel: Record<Commitment['status'], string> = {
   done: 'Done',
@@ -105,14 +114,38 @@ function Commitments({ day, progress }: { day: Day; progress: DayProgress }) {
 }
 
 export default async function TodayPage() {
-  const day = await getDayRepository().getDay(DEMO_TODAY);
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return (
+      <EmptyState
+        title="You are signed out."
+        body="Signing in arrives with onboarding in stage 5. Until then, demo mode is the way in."
+      />
+    );
+  }
+
+  // The day is the user's local day, in the zone their account records in —
+  // never the server's. The demo account is pinned to its fixed sample day so
+  // that screenshots and tests keep agreeing.
+  const { day, timeZone } = await withUser(user.id, async (repository) => {
+    const zone = await repository.getTimeZone(user.id);
+    const date = user.isDemo ? DEMO_TODAY : toLocalDate(new Date(), zone);
+    return { day: await repository.getDay(user.id, date), timeZone: zone };
+  });
 
   if (!day) {
     return (
-      <EmptyState
-        title="Nothing planned yet."
-        body="Pick one thing. A day with one thing on it still counts."
-      />
+      <div className="space-y-4">
+        <PageHeader
+          eyebrow={longDate(toLocalDate(new Date(), timeZone))}
+          title="Nothing planned yet."
+        />
+        <EmptyState
+          title="Pick one thing."
+          body="A day with one thing on it still counts. Planning arrives in stage 6."
+        />
+      </div>
     );
   }
 
@@ -137,15 +170,16 @@ export default async function TodayPage() {
           <FocusTimer totalSeconds={25 * 60} />
         </div>
         <p className="mt-4 text-body-sm text-ink-muted">
-          The timer works. Attaching a session to a task, and keeping its history, arrives in stage
-          6 — nothing you run here is recorded yet.
+          The timer works, and the database can record a session idempotently. Attaching one to a
+          task and keeping its history arrives in stage 6 — nothing you run here is recorded yet.
         </p>
       </Section>
 
       <Card className="p-4">
         <p className="text-body-sm text-ink-muted">
           Checking items off, committing to the day and the evening review arrive in stage 6. This
-          screen reads real data through the repository layer — nothing here is a mock control.
+          screen reads real data through the repository layer — the same contract the Postgres
+          adapter is held to.
         </p>
       </Card>
     </div>

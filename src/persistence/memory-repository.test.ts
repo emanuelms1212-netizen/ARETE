@@ -1,28 +1,39 @@
 import { describe, expect, it } from 'vitest';
 import { createMemoryRepository } from './memory-repository';
-import { DEMO_TODAY, demoDays } from './demo-data';
+import { describeRepositoryContract } from './repository-contract';
+import { DEMO_TODAY, DEMO_USER_ID, demoDays } from './demo-data';
 
-describe('memory repository', () => {
-  it('returns the demo day for a known date', async () => {
-    const day = await createMemoryRepository().getDay(DEMO_TODAY);
+describeRepositoryContract('memory', async () => {
+  let repository = createMemoryRepository('contract-user', []);
+  return {
+    get repository() {
+      return repository;
+    },
+    userId: 'contract-user',
+    async reset() {
+      repository = createMemoryRepository('contract-user', []);
+    },
+  };
+});
+
+describe('the demo seed', () => {
+  it('serves the fixed sample day', async () => {
+    const repository = createMemoryRepository(DEMO_USER_ID);
+    const day = await repository.getDay(DEMO_USER_ID, DEMO_TODAY);
 
     expect(day?.date).toBe(DEMO_TODAY);
     expect(day?.commitments.length).toBeGreaterThan(0);
   });
 
-  it('returns null rather than an empty day for an unknown date', async () => {
-    expect(await createMemoryRepository().getDay('1999-01-01')).toBeNull();
-  });
-
-  it('lists days newest first', async () => {
-    const days = await createMemoryRepository().listDays();
-
-    expect(days.map((day) => day.date)).toEqual(['2026-03-16', '2026-03-15', '2026-03-14']);
-  });
-
   it('is deterministic across instances', async () => {
-    const first = await createMemoryRepository().listDays();
-    const second = await createMemoryRepository().listDays();
+    const first = await createMemoryRepository(DEMO_USER_ID).listDays(DEMO_USER_ID, {
+      from: '2000-01-01',
+      to: '2100-01-01',
+    });
+    const second = await createMemoryRepository(DEMO_USER_ID).listDays(DEMO_USER_ID, {
+      from: '2000-01-01',
+      to: '2100-01-01',
+    });
 
     expect(first).toEqual(second);
   });
@@ -34,5 +45,17 @@ describe('memory repository', () => {
     expect(statuses).toContain('pending');
     expect(statuses).toContain('skipped');
     expect(demoDays.some((day) => day.mark === 'travel')).toBe(true);
+  });
+
+  it("keeps one account's writes out of another's", async () => {
+    const repository = createMemoryRepository(DEMO_USER_ID);
+    await repository.upsertDay('someone-else', {
+      localDate: DEMO_TODAY,
+      timeZone: 'UTC',
+      commitments: [{ kind: 'task', title: 'Not yours' }],
+    });
+
+    const demoDay = await repository.getDay(DEMO_USER_ID, DEMO_TODAY);
+    expect(demoDay?.commitments.some((c) => c.title === 'Not yours')).toBe(false);
   });
 });

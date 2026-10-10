@@ -195,18 +195,117 @@ Two things were changed because of what the screenshots showed: the breathing ri
 a filled disc rather than a ring, so it gained a static guide circle and a larger scale
 travel; and the three Today metrics wrapped 2-then-1, so they became a three-column grid.
 
-## Stage 4 — Data model, authentication and persistence — not started
+## Stage 4 — Data model, authentication and reliable persistence
 
-- [ ] Supabase project created and connection shape recorded in `.env.example`
-- [ ] Schema migration for every entity in `PRODUCT_SPEC.md` §6
-- [ ] Row-level security on every table, from the first migration
-- [ ] Supabase adapter behind `DayRepository`, interface widened to cover writes
-- [ ] `live` mode genuinely supported; the stage-2 guard removed
-- [ ] Auth: email plus one social provider, sessions, and deletion that deletes
-- [ ] Deterministic seed matching the demo adapter
-- [ ] Integration tests against a real database, including an RLS isolation test
+### Schema and migrations
+
+- [x] Ten migrations apply **from zero** to a real Postgres — asserted, not assumed
+- [x] All 36 tables the brief lists are present, plus `daily_plan_items` — asserted by name
+- [x] Timezone-safe dates: `local_date` plus the `timezone` it was recorded in, everywhere
+- [x] Recurring schedules modelled as rules with effective ranges, so past days expand with
+      the rule that applied then
+- [x] Soft deletion where history matters (`archived_at` on goals, projects, tasks, habits,
+      programmes, foods); append-only where the row _is_ the history
+- [x] Idempotent writes: `client_token` with `unique (user_id, client_token)` on every
+      session and log table
+- [x] Units: metric in storage, `preferences.unit_system` for display only
+- [x] Provenance on imported content — `content_sources`, `content_packs`, and rights columns
+      on `flexibility_programs`
+- [x] Template, instance and log are separate tables throughout
+- [x] No derived aggregate is stored; progress is computed
+
+### Authorization — tried, not claimed
+
+- [x] Row-level security **enabled and forced** on every table — a test lists any that are not
+- [x] Every table has at least one policy — a test lists any that do not
+- [x] A user sees exactly their own rows in every owned table
+- [x] Another user's journal entry is invisible even when asked for by id
+- [x] Inserting a row owned by someone else is rejected
+- [x] Updating or deleting another user's rows affects zero rows
+- [x] Moving one's own row to another owner is rejected
+- [x] An unauthenticated session sees nothing at all
+- [x] Library content is readable by any signed-in user and writable by none
+- [x] The production SQL passes its contract **through** the policies, so a policy that is
+      too strict fails as loudly as one that is too loose
+
+### Product rules in the schema
+
+- [x] An analytics payload with a free-text-looking key is rejected by a check constraint
+- [x] A quote may not carry an author unless its attribution is verified
+- [x] A skipped item must have a reason
+- [x] A workout movement is counted in reps or in time, never both
+- [x] Cognitive sessions hold practice counts only — no column is a cognitive score
+- [x] The flexibility programme ships `rights_status = 'pending'` and cannot be served
+
+### Typed access and repositories
+
+- [x] One repository contract, two implementations, **one shared test suite** — 13 tests each
+- [x] Reads and writes both go through the contract
+- [x] Demo mode is writable in memory and the UI says changes last until the server restarts
+- [x] Editing a day keeps the status of the items that survive the edit
+- [x] A focus session recorded three times is one row — asserted for both adapters
+
+### Domain
+
+- [x] Local-day arithmetic across the date line and both daylight-saving boundaries —
+      23-hour and 25-hour days asserted
+- [x] A wall-clock time inside the spring-forward gap resolves forward
+- [x] Recurrence: daily, weekly-by-weekday and monthly-by-day, anchored to the start date,
+      honouring the user's week start, skipping months that lack the day
+- [x] Recurrence rendered back in plain English
+- [x] Unit conversions round-trip without drift, including the source material's own numbers
+- [x] Idempotency keys are stable for the same write and distinct for different ones
+
+### Authentication
+
+- [x] Auth behind an interface; the app asks "who is this?", never "what did Supabase say?"
+- [x] Demo identity for demo mode; Supabase session for live mode
+- [x] Demo sign-in **refuses with an explanation** rather than silently doing nothing
+- [x] Supabase is used for authentication only — data access is plain SQL
+- [ ] Sign-in screen — **stage 5**, with onboarding
+- [ ] Social provider enabled — needs the Supabase project
+
+### Export and deletion
+
+- [x] `export_my_data()` returns the whole account as JSON, immediately, as the caller
+- [x] `delete_my_account()` removes the account and everything attached, irreversibly
+- [x] Deletion cannot be aimed at another account — the subject comes from the session
+- [x] `user_owned_tables()` names what export covers, so a forgotten table is a visible bug
+
+### Seed
+
+- [x] Deterministic: no random values, no current time
+- [x] Idempotent: running it twice changes nothing — asserted
+- [x] Every source document from the source map, with its licence
+- [x] Packs that may never be enabled by default are flagged as such
+- [x] A seeded database shows the same demo day the in-memory repository serves — asserted
+- [x] `npm run db:migrate` · `db:seed` · `db:reset`, service-role connection, never on the
+      request path
+
+### Environment
+
+- [x] Live mode is genuinely supported; the stage-2 guard is gone
+- [x] Live mode names every missing variable rather than failing vaguely
+- [x] A service-role `DATABASE_URL` is rejected at boot, because it would bypass every policy
+- [x] `.env.example` explains which values are public and which are deployment-only
+
+### Verification
+
+- [x] `npm test` — **242** unit, component and database tests
+- [x] `npm run e2e` — **36** end-to-end tests at phone and desktop widths
+- [x] Format, lint, typecheck and build all clean
+- [x] `/today` is dynamic, so no account's data is baked into a build
+
+### Not done, and why
+
+- [ ] **Migrations applied to a hosted database** — no Supabase project exists yet.
+      This is the one item blocked on the product owner; `PROJECT_LEDGER.md` §8 is the
+      twenty-minute checklist.
+- [ ] Repositories for the other ~30 tables — deliberately deferred to the stages that build
+      their screens. An interface written before its screen is an interface written twice.
+- [ ] Migration ledger table — needed before the first production deploy.
 
 ## Stages 5–17 — not started
 
-Tracked in `docs/PROJECT_LEDGER.md` §8. No item below stage 4 may be ticked before the
+Tracked in `docs/PROJECT_LEDGER.md` §8. No item below stage 5 may be ticked before the
 stage that builds it has run and been verified.
