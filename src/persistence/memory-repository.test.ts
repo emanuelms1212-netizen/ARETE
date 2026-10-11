@@ -4,14 +4,17 @@ import { describeRepositoryContract } from './repository-contract';
 import { DEMO_TODAY, DEMO_USER_ID, demoDays } from './demo-data';
 
 describeRepositoryContract('memory', async () => {
-  let repository = createMemoryRepository('contract-user', []);
+  // An empty account: no demo days and no demo goals, tasks or habits. The
+  // contract describes what the repository promises, not what the demo seed
+  // happens to contain.
+  let repository = createMemoryRepository('contract-user', [], null);
   return {
     get repository() {
       return repository;
     },
     userId: 'contract-user',
     async reset() {
-      repository = createMemoryRepository('contract-user', []);
+      repository = createMemoryRepository('contract-user', [], null);
     },
   };
 });

@@ -40,6 +40,15 @@ export interface Commitment {
   readonly skipReason?: string;
   /** Optional link back to the goal this serves. */
   readonly goalId?: Id;
+  /**
+   * The row this commitment stands for, in the table named by `kind` — the
+   * habit that was ticked, the task that was finished. Optional, because a
+   * commitment outlives the thing it referred to and the title is what the day
+   * is rendered from.
+   */
+  readonly refId?: Id;
+  /** Where this went when it was moved to another day. */
+  readonly snoozedTo?: IsoDate;
 }
 
 export interface Day {

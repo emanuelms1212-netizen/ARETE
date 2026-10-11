@@ -1,8 +1,12 @@
 // @vitest-environment node
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { checksumOf } from './migrator';
 import {
   USER_A,
   USER_B,
+  applyMigrationsTo,
   createTestDatabase,
   migrationFilenames,
   seedTwoUsers,
@@ -26,6 +30,38 @@ async function rows<T = Record<string, unknown>>(sql: string, params: unknown[] 
 }
 
 describe('migrations', () => {
+  it('apply exactly once, so a second db:migrate is a no-op', async () => {
+    // `db:migrate` is run on every deploy. Before the ledger existed it
+    // replayed the whole directory, and the early migrations create tables
+    // unconditionally — so the second run failed. This asserts the fix through
+    // the production runner rather than a copy of it.
+    const result = await applyMigrationsTo(database);
+
+    expect(result.applied).toEqual([]);
+    expect(result.skipped).toEqual(migrationFilenames());
+  }, 120_000);
+
+  it('refuse to run when an applied migration has since been edited', async () => {
+    // A quiet divergence between the database and the repository is the kind
+    // of thing found during an incident. It is found here instead.
+    await database.asOwner();
+    await database.db.exec(
+      `update public.schema_migrations set checksum = 'tampered'
+         where filename = '0001_foundation.sql'`,
+    );
+
+    await expect(applyMigrationsTo(database)).rejects.toThrow(/0001_foundation\.sql/);
+
+    // Restore it, because the other tests share this database.
+    await database.db.query(
+      `update public.schema_migrations set checksum = $1 where filename = $2`,
+      [
+        checksumOf(readFileSync(resolve('supabase/migrations/0001_foundation.sql'), 'utf8')),
+        '0001_foundation.sql',
+      ],
+    );
+  }, 120_000);
+
   it('apply from zero', async () => {
     expect(migrationFilenames().length).toBeGreaterThan(0);
     const tables = await rows<{ count: number }>(

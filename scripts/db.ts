@@ -1,20 +1,21 @@
 /**
  * Database CLI: apply migrations, then seed.
  *
- *   npm run db:migrate   — apply every migration, in order, from zero
+ *   npm run db:migrate   — apply every migration that has not been applied yet
  *   npm run db:seed      — content, and the demo account outside production
  *   npm run db:reset     — both, against a disposable database
+ *
+ * Migrations are recorded in `public.schema_migrations`, so each file runs
+ * exactly once and an already-applied file that has since been edited fails
+ * loudly rather than diverging quietly. See src/persistence/migrator.ts.
  *
  * Reads SUPABASE_DB_URL (service role, which bypasses row-level security)
  * because creating tables and inserting shipped content are deployment work,
  * never something a request does.
  */
-import { readFileSync, readdirSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { createPgExecutor } from '../src/persistence/pg-executor';
+import { migrate } from '../src/persistence/migrator';
 import { seedContent, seedDemoAccount } from '../src/persistence/seed';
-
-const MIGRATIONS = resolve(process.cwd(), 'supabase/migrations');
 
 async function main(): Promise<void> {
   const command = process.argv[2] ?? 'migrate';
@@ -34,11 +35,15 @@ async function main(): Promise<void> {
 
   try {
     if (command === 'migrate' || command === 'reset') {
-      for (const file of readdirSync(MIGRATIONS)
-        .filter((n) => n.endsWith('.sql'))
-        .sort()) {
-        process.stdout.write(`applying ${file}\n`);
-        await executor.query(readFileSync(resolve(MIGRATIONS, file), 'utf8'));
+      const result = await migrate(executor, {
+        onApply: (file) => process.stdout.write(`applying ${file}\n`),
+      });
+      if (result.applied.length === 0) {
+        process.stdout.write(`nothing to apply; ${result.skipped.length} already applied\n`);
+      } else {
+        process.stdout.write(
+          `applied ${result.applied.length}, skipped ${result.skipped.length}\n`,
+        );
       }
     }
 

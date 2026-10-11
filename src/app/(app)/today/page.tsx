@@ -2,25 +2,29 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getCurrentUser } from '@/auth';
 import { DemoBadge } from '@/components/demo-badge';
+import { DayBoard } from '@/components/today/day-board';
+import { EveningReview } from '@/components/today/evening-review';
+import { Framing } from '@/components/today/framing';
+import { FocusSessionPanel } from '@/components/focus/focus-session';
+import { EmptyState, Metric, PageHeader, Section } from '@/components/ui';
+import { computeDayProgress, describeDay, type DayProgress } from '@/domain';
+import { withUser } from '@/persistence';
+import { resolveCurrentDay } from '../current-day';
 import {
-  Card,
-  EmptyState,
-  FocusTimer,
-  ListRow,
-  Metric,
-  PageHeader,
-  Section,
-  StatusDot,
-} from '@/components/ui';
+  finishFocusAction,
+  pauseFocusAction,
+  resumeFocusAction,
+  startFocusAction,
+} from './focus-actions';
 import {
-  computeDayProgress,
-  describeDay,
-  toLocalDate,
-  type Commitment,
-  type Day,
-  type DayProgress,
-} from '@/domain';
-import { DEMO_TODAY, withUser } from '@/persistence';
+  addCommitmentAction,
+  reorderCommitmentsAction,
+  saveDayReviewAction,
+  setCommitmentStatusAction,
+  setFramingAction,
+  setMinimumModeAction,
+  snoozeCommitmentAction,
+} from './actions';
 
 export const metadata: Metadata = { title: 'Today' };
 
@@ -30,18 +34,6 @@ export const metadata: Metadata = { title: 'Today' };
  * so it is dynamic in both rather than depending on which mode built it.
  */
 export const dynamic = 'force-dynamic';
-
-const statusLabel: Record<Commitment['status'], string> = {
-  done: 'Done',
-  pending: 'Open',
-  skipped: 'Skipped',
-};
-
-const statusTone: Record<Commitment['status'], 'done' | 'open' | 'skipped'> = {
-  done: 'done',
-  pending: 'open',
-  skipped: 'skipped',
-};
 
 function longDate(iso: string): string {
   const [year, month, day] = iso.split('-').map(Number);
@@ -101,41 +93,6 @@ function MinimumDay({ progress }: { progress: DayProgress }) {
   );
 }
 
-function Commitments({ day, progress }: { day: Day; progress: DayProgress }) {
-  return (
-    <Section
-      title="Today"
-      hint={`${progress.done} done · ${progress.pending} open · ${progress.skipped} skipped`}
-    >
-      {day.commitments.length === 0 ? (
-        <EmptyState title="Nothing planned yet." body="Pick one thing." />
-      ) : (
-        <ul>
-          {day.commitments.map((commitment) => (
-            <ListRow
-              key={commitment.id}
-              leading={<StatusDot tone={statusTone[commitment.status]} />}
-              title={commitment.title}
-              detail={commitment.skipReason}
-              muted={commitment.status === 'skipped'}
-              trailing={
-                <>
-                  {commitment.isMinimum ? (
-                    <span className="mr-2 rounded-full bg-accent-soft px-2 py-0.5 text-label text-accent">
-                      Minimum
-                    </span>
-                  ) : null}
-                  {statusLabel[commitment.status]}
-                </>
-              }
-            />
-          ))}
-        </ul>
-      )}
-    </Section>
-  );
-}
-
 export default async function TodayPage() {
   const user = await getCurrentUser();
 
@@ -143,78 +100,83 @@ export default async function TodayPage() {
     return (
       <EmptyState
         title="You are signed out."
-        body="Signing in arrives with onboarding in stage 5. Until then, demo mode is the way in."
+        body="Signing in arrives with the Supabase project. Until then, demo mode is the way in."
       />
     );
   }
 
-  // The day is the user's local day, in the zone their account records in —
-  // never the server's.
-  const { day, timeZone, onboarded } = await withUser(user.id, async (repository) => {
-    const zone = await repository.getTimeZone(user.id);
-    const { progress } = await repository.getOnboarding(user.id);
-    const today = toLocalDate(new Date(), zone);
+  // The page and the actions must agree on which day this screen is about;
+  // `resolveCurrentDay` is the one answer both of them use.
+  const { day, framing, review, runningFocus, focusTasks, localDate, onboarded } = await withUser(
+    user.id,
+    async (repository) => {
+      const { localDate: date } = await resolveCurrentDay(repository, user);
+      const { progress } = await repository.getOnboarding(user.id);
 
-    // Once a plan has been accepted, today is today. Before that, the demo
-    // account falls back to its fixed sample day so that screenshots and tests
-    // keep agreeing on what Today looks like.
-    const real = await repository.getDay(user.id, today);
-    const fallback =
-      real === null && user.isDemo ? await repository.getDay(user.id, DEMO_TODAY) : null;
+      return {
+        day: await repository.getDay(user.id, date),
+        framing: await repository.getFraming(user.id, date),
+        review: await repository.getDayReview(user.id, date),
+        // Read on the server, so a reload restores a running timer before the
+        // page has even hydrated.
+        runningFocus: await repository.getRunningFocusSession(user.id),
+        focusTasks: (await repository.listTasks(user.id, { view: 'today', today: date })).map(
+          (task) => ({ id: task.id, title: task.title }),
+        ),
+        localDate: date,
+        onboarded: progress.completedAt !== null,
+      };
+    },
+  );
 
-    return {
-      day: real ?? fallback,
-      timeZone: zone,
-      onboarded: progress.completedAt !== null,
-    };
-  });
-
-  if (!day) {
-    return (
-      <div className="space-y-4">
-        <PageHeader
-          eyebrow={longDate(toLocalDate(new Date(), timeZone))}
-          title="Nothing planned yet."
-        />
-        <SetUpFirstWeek onboarded={onboarded} />
-      </div>
-    );
-  }
-
-  const progress = computeDayProgress(day);
+  const resolvedDay = day ?? {
+    date: localDate,
+    mark: 'normal' as const,
+    committedAt: null,
+    commitments: [],
+  };
+  const progress = computeDayProgress(resolvedDay);
 
   return (
     <div className="space-y-4">
       <PageHeader
-        eyebrow={longDate(day.date)}
-        title={describeDay(day, progress)}
+        eyebrow={longDate(resolvedDay.date)}
+        title={describeDay(resolvedDay, progress)}
         meta={<DemoBadge />}
       />
 
       {onboarded ? null : <SetUpFirstWeek onboarded={onboarded} />}
+
+      <Framing
+        intention={framing.intention}
+        inMyControl={framing.inMyControl}
+        notMyControl={framing.notMyControl}
+        minimumMode={framing.minimumMode}
+        onSave={setFramingAction}
+        onMinimumMode={setMinimumModeAction}
+      />
+
       <MinimumDay progress={progress} />
-      <Commitments day={day} progress={progress} />
 
-      <Section
-        title="Focus"
-        hint="One task, one block. The timer runs on wall-clock time, so backgrounding the app does not lose it."
-      >
-        <div className="py-2">
-          <FocusTimer totalSeconds={25 * 60} />
-        </div>
-        <p className="mt-4 text-body-sm text-ink-muted">
-          The timer works, and the database can record a session idempotently. Attaching one to a
-          task and keeping its history arrives in stage 6 — nothing you run here is recorded yet.
-        </p>
-      </Section>
+      <DayBoard
+        day={resolvedDay}
+        minimumMode={framing.minimumMode}
+        onSetStatus={setCommitmentStatusAction}
+        onAdd={addCommitmentAction}
+        onReorder={reorderCommitmentsAction}
+        onSnooze={snoozeCommitmentAction}
+      />
 
-      <Card className="p-4">
-        <p className="text-body-sm text-ink-muted">
-          Checking items off, committing to the day and the evening review arrive in stage 6. This
-          screen reads real data through the repository layer — the same contract the Postgres
-          adapter is held to.
-        </p>
-      </Card>
+      <FocusSessionPanel
+        initialSession={runningFocus}
+        tasks={focusTasks}
+        onStart={startFocusAction}
+        onPause={pauseFocusAction}
+        onResume={resumeFocusAction}
+        onFinish={finishFocusAction}
+      />
+
+      <EveningReview progress={progress} existing={review} onSave={saveDayReviewAction} />
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 The schema, and the reasoning behind it.
 
-**Source of truth:** `supabase/migrations/` — eleven files, applied in order, 43 tables.
+**Source of truth:** `supabase/migrations/` — twelve files, applied in order, 46 tables.
 **Proof:** `src/persistence/rls.test.ts` applies them from zero to a real Postgres and tries
 to break the isolation. `src/persistence/sql-repository.test.ts` holds the production SQL to
 the same contract as the demo adapter, through the policies.
@@ -129,6 +129,21 @@ The connection on the request path must be a role that RLS _applies to_. Environ
 validation rejects a `DATABASE_URL` that looks like a service-role connection, because that
 would bypass every policy on this page. The service role belongs to `npm run db:migrate` and
 `npm run db:seed`, and nowhere else.
+
+## 6a. How migrations are applied
+
+`npm run db:migrate` used to replay every file on every run, and this document used to say
+that was safe because the files were idempotent. They were not: the early migrations create
+tables unconditionally and fail the second time. A test of the claim found it (D39).
+
+`public.schema_migrations` now records each applied file with a SHA-256 of its contents.
+Each file runs exactly once, and a file that has already been applied and has since been
+**edited** aborts the whole run by name, rather than leaving the database quietly out of step
+with the repository. The runner is one function, `src/persistence/migrator.ts`, used by both
+the CLI and the tests — so the test exercises the code that deploys, not a copy of it.
+
+The ledger is deployment infrastructure, so row-level security is enabled and forced on it
+with a policy that permits nothing (D40). It is readable only by the service role.
 
 ## 7. Running it
 

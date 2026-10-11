@@ -11,7 +11,8 @@ import {
   type OnboardingProgress,
   type OnboardingStep,
 } from '@/domain';
-import { demoDays } from './demo-data';
+import { demoDays, demoSeed, type DemoSeed } from './demo-data';
+import { createMemoryDailySystem } from './memory/daily-system';
 import {
   RecordNotFoundError,
   type AccountExport,
@@ -52,6 +53,12 @@ function key(userId: string, localDate: IsoDate): string {
 export function createMemoryRepository(
   seedUserId: string,
   seed: readonly Day[] = demoDays,
+  /**
+   * Goals, tasks and habits for the seeded account. `null` is an empty
+   * account — what the contract suite asks for, mirroring the empty `seed`
+   * it already passes for days.
+   */
+  planSeed: DemoSeed | null = demoSeed,
 ): AreteRepository {
   const state: MemoryState = {
     days: new Map(),
@@ -74,6 +81,23 @@ export function createMemoryRepository(
     state.days.set(key(userId, day.date), day);
     return structuredClone(day) as Day;
   }
+
+  function emptyDay(localDate: IsoDate): Day {
+    return { date: localDate, mark: 'normal', committedAt: null, commitments: [] };
+  }
+
+  // Goals, tasks, habits, the day's framing and the live timer. Kept in their
+  // own module because the day loop added five entities at once.
+  const daily = createMemoryDailySystem({
+    getDay: (userId, localDate) => state.days.get(key(userId, localDate)),
+    requireDay,
+    saveDay: save,
+    emptyDay,
+  });
+
+  // The demo account gets goals, tasks and habits too, so the Plan screen
+  // shows the states the design has to survive rather than three empty ones.
+  if (planSeed !== null) daily.seed(seedUserId, planSeed);
 
   function onboardingFor(userId: string): OnboardingRecord {
     let record = state.onboarding.get(userId);
@@ -124,6 +148,7 @@ export function createMemoryRepository(
 
   return {
     kind: 'memory',
+    ...daily,
 
     async getOnboarding(userId: string) {
       return onboardingState(userId);

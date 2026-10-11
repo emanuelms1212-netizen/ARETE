@@ -1,6 +1,8 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
+import { migrate, migrationFilenames } from '../migrator';
+import type { ScriptExecutor } from '../sql-executor';
 
 /**
  * A real Postgres, in process, for the authorization tests.
@@ -21,14 +23,39 @@ export interface TestDatabase {
   close(): Promise<void>;
 }
 
+/**
+ * PGlite as the migration runner expects it.
+ *
+ * `query` speaks the extended protocol and takes one statement; `exec` speaks
+ * the simple one and takes a whole file. Both exist on PGlite under different
+ * names, so this is a rename rather than an implementation.
+ */
+export function scriptExecutor(db: PGlite): ScriptExecutor {
+  return {
+    async query(text, params) {
+      const result = await db.query(text, params ? [...params] : undefined);
+      return { rows: result.rows as never[] };
+    },
+    async execScript(sql) {
+      await db.exec(sql);
+    },
+  };
+}
+
 function sqlFile(...parts: string[]): string {
   return readFileSync(resolve(process.cwd(), ...parts), 'utf8');
 }
 
-export function migrationFilenames(): string[] {
-  return readdirSync(resolve(process.cwd(), 'supabase/migrations'))
-    .filter((name) => name.endsWith('.sql'))
-    .sort();
+export { migrationFilenames };
+
+/**
+ * Runs the migration runner again, exactly as `db:migrate` would.
+ *
+ * This is the production code path, not a reimplementation of it: if the
+ * runner stopped skipping applied files, this would fail.
+ */
+export async function applyMigrationsTo(database: TestDatabase) {
+  return migrate(scriptExecutor(database.db));
 }
 
 /** Applies the auth shim and then every migration, in order, from nothing. */
@@ -36,9 +63,7 @@ export async function createTestDatabase(): Promise<TestDatabase> {
   const db = await PGlite.create();
 
   await db.exec(sqlFile('supabase/test/0000_auth_shim.sql'));
-  for (const name of migrationFilenames()) {
-    await db.exec(sqlFile('supabase/migrations', name));
-  }
+  await migrate(scriptExecutor(db));
 
   return {
     db,

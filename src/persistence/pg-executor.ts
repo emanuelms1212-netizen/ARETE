@@ -1,5 +1,5 @@
 import { Pool, type PoolConfig } from 'pg';
-import type { SqlExecutor } from './sql-executor';
+import type { ScriptExecutor, SqlExecutor } from './sql-executor';
 
 /**
  * The production executor: a pooled Postgres connection.
@@ -12,7 +12,7 @@ import type { SqlExecutor } from './sql-executor';
  * work, so that row-level security applies. The service-role connection string
  * bypasses RLS entirely and belongs only to migrations and the seed.
  */
-export interface PgExecutor extends SqlExecutor {
+export interface PgExecutor extends ScriptExecutor {
   /** Runs `work` with the session identified as `userId`, inside a transaction. */
   withUser<T>(userId: string, work: (executor: SqlExecutor) => Promise<T>): Promise<T>;
   end(): Promise<void>;
@@ -26,6 +26,12 @@ export function createPgExecutor(config: PoolConfig | string): PgExecutor {
     async query(text, params) {
       const result = await pool.query(text, params ? [...params] : undefined);
       return { rows: result.rows };
+    },
+
+    async execScript(sql) {
+      // No parameters, so `pg` uses the simple query protocol and the whole
+      // file runs as one implicit transaction.
+      await pool.query(sql);
     },
 
     async withUser(userId, work) {

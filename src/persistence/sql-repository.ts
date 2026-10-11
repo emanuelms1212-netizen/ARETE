@@ -19,6 +19,7 @@ import {
   type SetCommitmentStatusInput,
   type UpsertDayInput,
 } from './repository';
+import { createSqlDailySystem } from './sql/daily-system';
 import type { SqlExecutor } from './sql-executor';
 
 interface PlanRow {
@@ -31,10 +32,12 @@ interface PlanRow {
 interface ItemRow {
   id: string;
   kind: Commitment['kind'];
+  ref_id: string | null;
   title_snapshot: string;
   is_minimum: boolean;
   status: Commitment['status'];
   skip_reason: string | null;
+  snoozed_to: string | null;
 }
 
 interface FocusRow {
@@ -64,6 +67,8 @@ function toCommitment(row: ItemRow): Commitment {
     isMinimum: row.is_minimum,
     status: row.status,
     ...(row.skip_reason === null ? {} : { skipReason: row.skip_reason }),
+    ...(row.ref_id === null ? {} : { refId: row.ref_id }),
+    ...(row.snoozed_to === null ? {} : { snoozedTo: row.snoozed_to }),
   };
 }
 
@@ -88,7 +93,8 @@ export function createSqlRepository(executor: SqlExecutor): AreteRepository {
     if (!plan) return null;
 
     const items = await executor.query<ItemRow>(
-      `select id, kind, title_snapshot, is_minimum, status, skip_reason
+      `select id, kind, ref_id, title_snapshot, is_minimum, status, skip_reason,
+              snoozed_to::text
          from public.daily_plan_items
         where user_id = $1 and daily_plan_id = $2
         order by position, created_at`,
@@ -108,6 +114,23 @@ export function createSqlRepository(executor: SqlExecutor): AreteRepository {
     if (!day) throw new RecordNotFoundError(`No day ${localDate} for this account`);
     return day;
   }
+
+  /** The plan row for a day, created if the day does not have one yet. */
+  async function ensurePlan(userId: string, localDate: IsoDate, timeZone: string): Promise<string> {
+    const plans = await executor.query<{ id: string }>(
+      `insert into public.daily_plans (user_id, local_date, timezone)
+       values ($1, $2, $3)
+       on conflict (user_id, local_date) do update set timezone = excluded.timezone
+       returning id`,
+      [userId, localDate, timeZone],
+    );
+    const planId = plans.rows[0]?.id;
+    if (!planId) throw new Error('daily_plans upsert returned no row');
+    return planId;
+  }
+
+  // Goals, tasks, habits, the day's framing and the live timer.
+  const daily = createSqlDailySystem(executor, { loadDay, requireDay, ensurePlan });
 
   // ---------------------------------------------------------------------
   // Onboarding
@@ -318,6 +341,7 @@ export function createSqlRepository(executor: SqlExecutor): AreteRepository {
 
   return {
     kind: 'sql',
+    ...daily,
 
     async getOnboarding(userId: string) {
       return loadOnboarding(userId);

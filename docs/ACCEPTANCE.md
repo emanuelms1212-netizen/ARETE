@@ -409,7 +409,116 @@ travel; and the three Today metrics wrapped 2-then-1, so they became a three-col
       editable parameters is still ahead.
 - [ ] Repositories for `habits`, `habit_schedules` and `tasks` — stage 6, with their screens.
 
-## Stages 6–17 — not started
+## Stage 6 — Today, habits, goals, tasks and the Pomodoro
 
-Tracked in `docs/PROJECT_LEDGER.md` §8. No item below stage 6 may be ticked before the
+### The day, start to finish
+
+- [x] A morning intention, in one sentence
+- [x] The dichotomy of control as two boxes and a plain question — no lecture, no quote
+- [x] Both are optional; a screen that cannot be left unanswered gets lied to
+- [x] Today's commitments with complete, skip-with-reason, move-to-tomorrow and reorder
+- [x] Quick add, straight onto the day
+- [x] Every one of those is **optimistic, with a real revert** — the server's refusal restores
+      the previous state and says what was refused
+- [x] A skip asks why, because that is what makes it a decision rather than a failure
+- [x] A moved item stays visible, marked, so "I moved this" reads differently from "it vanished"
+- [x] The evening review: three prompts, in the order a tired person can answer them
+- [x] `met_minimum` is recorded, not recomputed, so editing the plan later cannot change it
+
+### Minimum mode
+
+- [x] A switch, not a verdict
+- [x] Turning it on touches **no item's status** — asserted in the contract suite and again
+      end to end
+- [x] The copy says a minimum day is what a real one looks like sometimes
+
+### Habits — four kinds
+
+- [x] Binary, count, duration and **limit**
+- [x] A limit inverts: the target is a ceiling, under it is the win
+- [x] A bigger number is never a better day for a limit habit — asserted
+- [x] Partial completion, with the value that made it partial
+- [x] Rest days are their own state, not a skip
+- [x] A skip needs a reason; the database refuses one without
+- [x] Meeting the user's own minimum continues the streak
+- [x] Rest, unscheduled and not-yet-finished days are stepped over, never counted against
+- [x] The longest run survives a miss, because what happened still happened
+- [x] **The status text is never a scolding** — a test asserts it across every history shape
+- [x] Rolling consistency is the number shown; the streak is secondary
+- [x] A habit's history starts at its first activity, so days before it existed are not misses
+
+### Goals — measured or judged, never faked
+
+- [x] Motivation, a measurable success statement, target and maintenance dates, milestones
+- [x] A measured goal gets a progress bar from readings
+- [x] **A judged goal gets none** — the return type has no ratio, so the UI cannot render one
+- [x] Completed milestones are never converted into a percentage — asserted end to end
+- [x] Descending goals (weight, a time) read as progress, not as loss
+- [x] One reading per day; a correction replaces rather than stacks
+- [x] A weekly review that changes the goal — pause, drop, done, or continue
+- [x] Archiving keeps the readings and reviews attached to it
+
+### Tasks
+
+- [x] Inbox, Today, Upcoming and Someday
+- [x] A task with no date is captured, not forgotten
+- [x] An overdue task appears in Today rather than disappearing into the past
+- [x] Subtasks, one level deep, enforced by a trigger and refused by both adapters
+- [x] A recurring task advances the series rather than ending it
+- [x] The series stays anchored when a task is finished late
+- [x] Energy, context and estimate are shown, because they decide what is doable at 9pm
+- [x] Archiving a parent archives its children — no orphans
+
+### The Pomodoro
+
+- [x] Adjustable presets, and a task link
+- [x] **Elapsed time is derived, never stored as a countdown**
+- [x] A refresh restores the running session with its time intact — the stage's own criterion
+- [x] Paused time is not counted as focus
+- [x] A pause is recorded as an interruption rather than hidden
+- [x] One running session per user, enforced by a partial unique index
+- [x] A retried start returns the same session; a **new** start after finishing does not get
+      handed the finished one (D50)
+- [x] The timer does not stop you mid-sentence — it counts past the planned time and says so
+- [x] Completion is announced through a live region, not a sound alone
+- [x] A one-line reflection, optional
+
+### Migrations, now applied once
+
+- [x] `public.schema_migrations` records every applied file with a checksum
+- [x] A second `db:migrate` applies nothing — asserted through the production runner
+- [x] An applied migration that has since been edited fails loudly, by name
+- [x] The ledger table is unreachable from the request path, and still has a policy
+
+### Verification
+
+- [x] `npm test` — **564** unit, component and database tests
+- [x] `npm run e2e` — **88** end-to-end tests at phone and desktop widths, against a
+      production build, including the stage's full acceptance journey in one test
+- [x] Format, lint, typecheck and build all clean
+- [x] Screenshots captured **and inspected** at 390×844 and 1440×900
+- [x] The suite run twice end to end with no flakes
+
+### Fixed because something other than a green test caught it
+
+- [x] The Today screen rendered one day and its actions wrote to another (D51)
+- [x] Two fields on one screen shared the label "What got in the way?"
+- [x] The focus start token collided with a just-finished session (D50)
+- [x] The segmented control overflowed at 320px — a flex item cannot shrink below its content
+      without `min-w-0`, which three options made visible for the first time
+- [x] Habit consistency read 7% for a habit kept most days, because days before the habit
+      existed counted as misses
+
+### Not done, and why
+
+- [ ] **Migrations applied to a hosted database** — still no Supabase project.
+- [ ] **Habit schedules are not expanded per day** (D54). The rule is stored and tested; the
+      screens do not read it yet.
+- [ ] **Tasks have no edit screen** — notes, estimates and recurrence are repository-only.
+- [ ] **Week two** — adaptation now has history to read, but nothing reads it.
+- [ ] Projects, and linking tasks to goals through the UI.
+
+## Stages 7–17 — not started
+
+Tracked in `docs/PROJECT_LEDGER.md` §8. No item below stage 7 may be ticked before the
 stage that builds it has run and been verified.

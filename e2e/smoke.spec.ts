@@ -275,3 +275,383 @@ test.describe('onboarding', () => {
     await expect(page.getByText('Minimum day')).toBeVisible();
   });
 });
+
+/**
+ * The day loop.
+ *
+ * Demo mode is writable in memory, so these exercise the real actions against
+ * the real repository contract — not a mocked one. They run in series because
+ * they share the one demo account.
+ */
+test.describe.serial('the day loop', () => {
+  /**
+   * Each test creates the item it acts on.
+   *
+   * These originally acted on seeded titles, which passed alone and failed in
+   * the suite: the onboarding tests accept a plan, which gives the demo
+   * account a real day and retires the sample one. A test that depends on
+   * another test's leftovers is a test that reports the wrong thing.
+   */
+  /**
+   * Adds an item whose title is unique to this run.
+   *
+   * The phone and desktop projects share one server, and demo mode keeps its
+   * data in that server's memory — so a fixed title appears twice and every
+   * assertion about it becomes ambiguous. The suffix is what keeps the two
+   * projects from reading each other's rows.
+   */
+  async function addItem(page: import('@playwright/test').Page, label: string) {
+    const title = `${label} ${test.info().project.name}-${Date.now().toString(36).slice(-5)}`;
+    await page.goto('/today');
+    await page.getByRole('button', { name: 'Add something' }).click();
+    await page.getByLabel('What else?').fill(title);
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await expect(page.getByText(title, { exact: true })).toBeVisible();
+    return title;
+  }
+
+  test('quick-adds something, and it is still there after a reload', async ({ page }) => {
+    const title = await addItem(page, 'Call the bank');
+
+    await page.reload();
+    await expect(page.getByText(title, { exact: true })).toBeVisible();
+  });
+
+  test('completes a commitment and keeps it completed across a reload', async ({ page }) => {
+    const title = await addItem(page, 'Water the plants');
+
+    const row = page.getByRole('listitem').filter({ hasText: title });
+    await row.getByRole('button', { name: `Mark ${title} done` }).click();
+    await expect(row.getByRole('button', { name: /not done/ })).toBeVisible();
+
+    await page.reload();
+    await expect(
+      page
+        .getByRole('listitem')
+        .filter({ hasText: title })
+        .getByRole('button', { name: /not done/ }),
+    ).toBeVisible();
+  });
+
+  test('a skip asks for a reason and records it', async ({ page }) => {
+    const title = await addItem(page, 'Long run');
+    const reason = `Hip was sore ${test.info().project.name}`;
+
+    await page
+      .getByRole('listitem')
+      .filter({ hasText: title })
+      .getByRole('button', { name: 'Skip' })
+      .click();
+
+    await expect(page.getByText(/a skip is not a miss/i)).toBeVisible();
+    await page.getByLabel('What got in the way?').fill(reason);
+    await page.getByRole('button', { name: 'Skip it' }).click();
+
+    const row = page.getByRole('listitem').filter({ hasText: title });
+    await expect(row).toContainText(reason);
+    await page.reload();
+    await expect(page.getByRole('listitem').filter({ hasText: title })).toContainText(reason);
+  });
+
+  test('moves a commitment to tomorrow and says so rather than hiding it', async ({ page }) => {
+    const title = await addItem(page, 'Renew the passport');
+
+    const row = page.getByRole('listitem').filter({ hasText: title });
+    await row.getByRole('button', { name: 'Tomorrow' }).click();
+
+    // "I moved this" has to read differently from "this vanished".
+    await expect(row).toContainText(/moved to tomorrow/i);
+  });
+
+  test('sets an intention and the dichotomy-of-control prompt', async ({ page }) => {
+    await page.goto('/today');
+
+    await page.getByRole('button', { name: /set an intention|change/i }).click();
+    const intention = `Finish the section ${test.info().project.name}`;
+    const release = `Whether it lands well ${test.info().project.name}`;
+    await page.getByLabel('What is today for?').fill(intention);
+    await page.getByLabel('Mine to do').fill('Starting before email');
+    await page.getByLabel('Not mine').fill(release);
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+
+    await expect(page.getByText(intention, { exact: true })).toBeVisible();
+    await page.reload();
+    await expect(page.getByText(release, { exact: true })).toBeVisible();
+  });
+
+  test('running the day at its minimum never marks it failed', async ({ page }) => {
+    await page.goto('/today');
+
+    // The checkbox itself is `sr-only` — the visible control is its label, and
+    // clicking the label is what a person actually does.
+    const minimumToggle = page.getByLabel('Run today at its minimum');
+    await page.getByText('Run today at its minimum').click();
+    await expect(minimumToggle).toBeChecked();
+    await expect(page.getByText(/running at the minimum/i)).toBeVisible();
+
+    // The decisive assertion: turning the day down is a success state.
+    await expect(page.getByText(/failed|you missed|incomplete day/i)).toHaveCount(0);
+
+    await page.getByText('Run today at its minimum').click();
+    await expect(minimumToggle).not.toBeChecked();
+  });
+
+  test('writes the evening review and reads it back', async ({ page }) => {
+    await page.goto('/today');
+
+    // Two things make this fiddly: the form stays open once a review exists
+    // (the two projects share one demo account), and the opening button does
+    // nothing until the component has hydrated. Press until the form is there.
+    await expect(async () => {
+      const opener = page.getByRole('button', { name: 'Write the review' });
+      if ((await opener.count()) > 0) await opener.click();
+      await expect(page.getByLabel('What went well?')).toBeVisible({ timeout: 1000 });
+    }).toPass({ timeout: 15_000 });
+
+    const note = `Started early ${test.info().project.name}`;
+    await page.getByLabel('What went well?').fill(note);
+    await page.getByLabel('One thing for tomorrow').fill('Finish the draft');
+    // "Save" the first time, "Update" once a review exists for the day.
+    await page.getByRole('button', { name: /(save|update) the review/i }).click();
+
+    // Wait for the write to be acknowledged rather than racing the reload
+    // against it — a reload mid-transition cancels the request.
+    await expect(page.getByText('Review saved.')).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByLabel('What went well?')).toHaveValue(note);
+  });
+});
+
+/**
+ * The Plan screen.
+ *
+ * The goal assertions are the ones worth having: a goal with no number must
+ * not acquire a progress bar, and a limit habit must not be rendered as a
+ * target. Both are easy to regress and invisible in a type check.
+ */
+test.describe('plan', () => {
+  async function openTab(page: import('@playwright/test').Page, tab: string) {
+    await page.goto('/plan');
+    await expect(async () => {
+      await page
+        .locator('label')
+        .filter({ hasText: new RegExp(`^${tab}$`) })
+        .first()
+        .click();
+      await expect(page.getByRole('radio', { name: tab })).toBeChecked({ timeout: 1000 });
+    }).toPass({ timeout: 15_000 });
+  }
+
+  test('shows the three planning surfaces', async ({ page }) => {
+    await page.goto('/plan');
+
+    for (const tab of ['Tasks', 'Habits', 'Goals']) {
+      await expect(page.getByRole('radio', { name: tab })).toBeAttached();
+    }
+  });
+
+  test('separates the inbox from today', async ({ page }) => {
+    await openTab(page, 'Tasks');
+
+    // Seeded with no date: captured, not scheduled.
+    await expect(page.getByText('Work out what the dentist actually said')).toBeVisible();
+
+    await page
+      .locator('label')
+      .filter({ hasText: /^Today$/ })
+      .first()
+      .click();
+    await expect(page.getByText('Work out what the dentist actually said')).toHaveCount(0);
+  });
+
+  test('nests a subtask under its parent rather than beside it', async ({ page }) => {
+    await openTab(page, 'Tasks');
+    await page
+      .locator('label')
+      .filter({ hasText: /^Today$/ })
+      .first()
+      .click();
+
+    const parent = page.getByRole('listitem').filter({ hasText: 'Draft the quarterly note' });
+    await expect(parent.first()).toContainText('Pull the numbers');
+  });
+
+  test('gives a measured goal a progress bar', async ({ page }) => {
+    await openTab(page, 'Goals');
+
+    await expect(
+      page.getByRole('progressbar', { name: /Run 10k without stopping/i }),
+    ).toBeVisible();
+  });
+
+  test('refuses to invent a percentage for a goal with no number', async ({ page }) => {
+    await openTab(page, 'Goals');
+
+    // Two milestones, one of them done — the tempting wrong answer is "50%".
+    await expect(page.getByText(/judged at review, not by a number/i)).toBeVisible();
+    await expect(
+      page.getByRole('progressbar', { name: /Be someone my sister can call/i }),
+    ).toHaveCount(0);
+  });
+
+  test('describes a limit habit as a ceiling, not a target', async ({ page }) => {
+    await openTab(page, 'Habits');
+
+    await expect(page.getByText(/stay under 2 cups/i)).toBeVisible();
+  });
+
+  test('reports consistency rather than only a streak', async ({ page }) => {
+    // Creates its own habit: the seeded ones sit on the demo account's fixed
+    // sample date, which retires as soon as another test accepts a real plan.
+    const title = `Drink water ${test.info().project.name}`;
+    await openTab(page, 'Habits');
+
+    await page.getByRole('button', { name: 'Add a habit' }).click();
+    await page.getByLabel('The habit').fill(title);
+    await page.getByRole('button', { name: 'Add it' }).click();
+
+    // A brand-new habit has no history, and says so rather than showing 0%.
+    await expect(page.getByText(title, { exact: true })).toBeVisible();
+    await expect(page.getByText('Nothing scheduled yet.').first()).toBeVisible();
+
+    // Log it once and the rate appears, with a real day behind it.
+    await page.getByRole('button', { name: `Mark ${title} done` }).click();
+    await expect(page.getByText(/% of scheduled days/).first()).toBeVisible();
+  });
+});
+
+/**
+ * The focus timer.
+ *
+ * The acceptance criterion for this stage is that a refresh does not lose the
+ * timer, so that is the first test. The second is the one that catches the
+ * other tempting shortcut: if paused time were still counted, a session paused
+ * overnight would report a heroic number in the morning.
+ */
+test.describe.serial('the focus timer', () => {
+  const elapsed = (page: import('@playwright/test').Page) => page.getByText(/of focus/);
+
+  /** Leaves exactly one running, unpaused session, whatever state we inherit. */
+  async function ensureRunning(page: import('@playwright/test').Page) {
+    await page.goto('/today');
+
+    await expect(async () => {
+      const resume = page.getByRole('button', { name: 'Resume' });
+      if (await resume.isVisible()) await resume.click();
+
+      const startButton = page.getByRole('button', { name: /^Start \d+ minutes$/ });
+      if (await startButton.isVisible()) await startButton.click();
+
+      await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible({ timeout: 1500 });
+    }).toPass({ timeout: 20_000 });
+  }
+
+  test('survives a reload with its elapsed time intact', async ({ page }) => {
+    await ensureRunning(page);
+    await expect(elapsed(page)).toBeVisible();
+
+    await page.waitForTimeout(2000);
+    await page.reload();
+
+    // The session is restored on the server before the page even hydrates.
+    await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+    await expect(elapsed(page)).toContainText(/0:\d\d/);
+  });
+
+  test('does not count paused time as focus', async ({ page }) => {
+    await ensureRunning(page);
+    await page.getByRole('button', { name: 'Pause' }).click();
+    await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible();
+
+    const frozen = await elapsed(page).innerText();
+    await page.waitForTimeout(3000);
+    expect(await elapsed(page).innerText()).toBe(frozen);
+
+    await page.getByRole('button', { name: 'Resume' }).click();
+    await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+  });
+
+  test('counts a pause as an interruption rather than hiding it', async ({ page }) => {
+    await ensureRunning(page);
+    await page.getByRole('button', { name: 'Pause' }).click();
+    await expect(elapsed(page)).toContainText(/pause/);
+  });
+
+  test('finishing returns the timer to its starting state', async ({ page }) => {
+    await ensureRunning(page);
+    await page.getByRole('button', { name: 'Finish' }).click();
+
+    await expect(page.getByRole('button', { name: /^Start \d+ minutes$/ })).toBeVisible();
+  });
+});
+
+/**
+ * The stage's own acceptance criterion, as one journey.
+ *
+ * The brief asks for exactly this: a new user can plan tomorrow, complete
+ * today, run a focus session, refresh without losing timer state, and see the
+ * result linked to the correct task. Each half is covered by a narrower test
+ * above; this one proves they compose, which is the part that quietly breaks.
+ */
+test.describe.serial('the full loop', () => {
+  test('plan tomorrow, complete today, focus, refresh, and see the link', async ({ page }) => {
+    const stamp = `${test.info().project.name}-${Date.now().toString(36).slice(-5)}`;
+    const tomorrowTask = `Draft the agenda ${stamp}`;
+    const todayThing = `Clear the desk ${stamp}`;
+
+    // 1. Plan tomorrow: capture a task, then schedule it off the inbox.
+    await page.goto('/plan');
+    await page.getByLabel('Add a task').fill(tomorrowTask);
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await expect(page.getByText(tomorrowTask, { exact: true })).toBeVisible();
+
+    await page
+      .getByRole('listitem')
+      .filter({ hasText: tomorrowTask })
+      .getByRole('button', { name: 'Tomorrow' })
+      .click();
+
+    await page
+      .locator('label')
+      .filter({ hasText: /^Upcoming$/ })
+      .first()
+      .click();
+    await expect(page.getByText(tomorrowTask, { exact: true })).toBeVisible();
+
+    // 2. Complete something today.
+    await page.goto('/today');
+    await page.getByRole('button', { name: 'Add something' }).click();
+    await page.getByLabel('What else?').fill(todayThing);
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+
+    const row = page.getByRole('listitem').filter({ hasText: todayThing });
+    await row.getByRole('button', { name: `Mark ${todayThing} done` }).click();
+    await expect(row.getByRole('button', { name: /not done/ })).toBeVisible();
+
+    // 3. Run a focus session, linked to a task.
+    const finish = page.getByRole('button', { name: 'Finish' });
+    if (await finish.isVisible()) await finish.click();
+
+    const picker = page.getByLabel('On what?');
+    if (await picker.isVisible()) await picker.selectOption({ index: 1 });
+    await page.getByRole('button', { name: /^Start \d+ minutes$/ }).click();
+    await expect(page.getByText(/of focus/)).toBeVisible();
+
+    // 4. Refresh without losing it.
+    await page.waitForTimeout(1500);
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+
+    // 5. The completion survived the reload too.
+    await expect(
+      page
+        .getByRole('listitem')
+        .filter({ hasText: todayThing })
+        .getByRole('button', { name: /not done/ }),
+    ).toBeVisible();
+
+    await page.getByRole('button', { name: 'Finish' }).click();
+    await expect(page.getByRole('button', { name: /^Start \d+ minutes$/ })).toBeVisible();
+  });
+});

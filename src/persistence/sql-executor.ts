@@ -13,6 +13,18 @@ export interface SqlExecutor {
 }
 
 /**
+ * An executor that can also run a multi-statement script.
+ *
+ * `query` speaks the extended protocol, which carries parameters but accepts
+ * exactly one statement — a migration file is many. This is deployment-only:
+ * nothing on the request path runs a script, and nothing here takes parameters,
+ * so there is no injection surface to widen.
+ */
+export interface ScriptExecutor extends SqlExecutor {
+  execScript(sql: string): Promise<void>;
+}
+
+/**
  * Runs `work` with the session identified as `userId`.
  *
  * Row-level security is the real boundary, and it reads the request's JWT

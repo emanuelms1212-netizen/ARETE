@@ -101,3 +101,54 @@ export type {
   GenerateOptions,
   PlanItem,
 } from './plan-generator';
+export {
+  HABIT_KINDS,
+  HABIT_STATUSES,
+  daysSinceLastCounted,
+  describeStreak,
+  habitLogSchema,
+  habitSchema,
+  isActiveOn,
+  outcomeFor,
+  rollingConsistency,
+  streakFrom,
+  targetForDay,
+} from './habits';
+export type {
+  Habit,
+  HabitDay,
+  HabitKind,
+  HabitLog,
+  HabitOutcome,
+  HabitStatus,
+  Streak,
+} from './habits';
+export {
+  GOAL_STATUSES,
+  GOAL_VERDICTS,
+  daysRemaining,
+  describeGoalTiming,
+  goalProgress,
+  goalSchema,
+  isMeasured,
+  reviewIsDue,
+  reviewWeekOf,
+} from './goals';
+export type { Goal, GoalProgress, GoalStatus, GoalVerdict, Measurement, Milestone } from './goals';
+export {
+  FOCUS_KINDS,
+  FOCUS_PRESETS,
+  FOCUS_STATUSES,
+  MINIMUM_COUNTED_SECONDS,
+  countsAsFocus,
+  describeLink,
+  elapsedSeconds,
+  finishPatch,
+  focusSessionSchema,
+  formatDuration,
+  pausePatch,
+  presetBySlug,
+  resumePatch,
+  timerView,
+} from './focus';
+export type { FocusKind, FocusPreset, FocusSession, FocusStatus, TimerView } from './focus';

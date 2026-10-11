@@ -21,9 +21,13 @@ interchangeable implementations.
 Onboarding asks eight skippable questions and generates a first week from the answers —
 capped, explained item by item, and saved only once the user has edited it and agreed.
 
-The product modules are still not built — Plan, Train and Progress render an honest "not
-built yet" state naming the stage that builds them. Three things that do work are shown
-working and labelled: the focus timer on Today, the breathing pacer on Mind, and onboarding.
+Today and Plan are live. Today holds the morning intention and the dichotomy-of-control
+prompt, the day's commitments with complete, skip-with-reason, move-to-tomorrow, reorder and
+quick-add, a minimum-day switch, a focus timer whose state lives on the server, and the
+evening review. Plan holds goals, tasks across four views, and habits of four kinds.
+
+Train and Progress still render an honest "not built yet" state naming the stage that builds
+them.
 
 See `docs/PROJECT_LEDGER.md` for where the build stands and what comes next,
 `docs/DATA_MODEL.md` for the schema and the reasoning behind it,

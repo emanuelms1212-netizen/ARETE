@@ -41,7 +41,11 @@ export function SegmentedControl<TValue extends string>({
           return (
             <label
               key={option.value}
-              className={`flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-full px-3 text-body-sm transition-colors duration-[var(--duration-fast)] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus ${
+              // `min-w-0` is load-bearing: a flex item's default minimum size
+              // is its content, so without it a label wider than its share
+              // pushes the whole control past the viewport. Three options at
+              // 320px is where that first shows.
+              className={`flex min-h-11 min-w-0 flex-1 cursor-pointer items-center justify-center rounded-full px-2 text-body-sm transition-colors duration-[var(--duration-fast)] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus sm:px-3 ${
                 selected ? 'bg-surface text-ink shadow-raised' : 'text-ink-muted hover:text-ink'
               }`}
             >
@@ -53,7 +57,7 @@ export function SegmentedControl<TValue extends string>({
                 onChange={() => onChange(option.value)}
                 className="sr-only"
               />
-              {option.label}
+              <span className="truncate">{option.label}</span>
             </label>
           );
         })}
