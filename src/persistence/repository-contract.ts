@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { generateFirstWeek } from '@/domain';
 import type { AreteRepository } from './repository';
 
 export interface ContractSubject {
@@ -232,6 +233,119 @@ export function describeRepositoryContract(
       expect(exported.schemaVersion).toBeGreaterThan(0);
       expect(Object.keys(exported.tables)).toContain('daily_plans');
       expect(exported.tables['daily_plans']?.length).toBeGreaterThan(0);
+    });
+
+    describe('onboarding', () => {
+      it('starts at the first step with the conservative profile', async () => {
+        const { repository, userId } = await fresh();
+        const state = await repository.getOnboarding(userId);
+
+        expect(state.progress.currentStep).toBe('intent');
+        expect(state.progress.completedSteps).toEqual([]);
+        expect(state.progress.completedAt).toBeNull();
+        // A user who has answered nothing still has a usable profile.
+        expect(state.profile.training.experience).toBe('returning');
+        expect(state.profile.minimum.minimumDaySize).toBe(1);
+      });
+
+      it('saves a step and moves on', async () => {
+        const { repository, userId } = await fresh();
+        const state = await repository.saveStep(userId, 'training', {
+          experience: 'experienced',
+          sessionMinutes: 60,
+        });
+
+        expect(state.profile.training.experience).toBe('experienced');
+        expect(state.profile.training.sessionMinutes).toBe(60);
+        expect(state.progress.completedSteps).toContain('training');
+        expect(state.progress.currentStep).toBe('health');
+      });
+
+      it('resumes where it was left', async () => {
+        const { repository, userId } = await fresh();
+        await repository.saveStep(userId, 'intent', { focuses: ['calm'] });
+
+        const resumed = await repository.getOnboarding(userId);
+        expect(resumed.progress.currentStep).toBe('schedule');
+        expect(resumed.profile.intent.focuses).toEqual(['calm']);
+      });
+
+      it('treats a skipped step as the conservative default, not as missing', async () => {
+        const { repository, userId } = await fresh();
+        const state = await repository.skipStep(userId, 'health');
+
+        expect(state.progress.skippedSteps).toContain('health');
+        expect(state.progress.completedSteps).not.toContain('health');
+        expect(state.profile.health.pregnancyStatus).toBe('not_applicable');
+        expect(state.profile.health.injuries).toEqual([]);
+      });
+
+      it('lets an answer be changed after it was given', async () => {
+        const { repository, userId } = await fresh();
+        await repository.saveStep(userId, 'minimum', { minimumDaySize: 3 });
+        const changed = await repository.saveStep(userId, 'minimum', { minimumDaySize: 1 });
+
+        expect(changed.profile.minimum.minimumDaySize).toBe(1);
+      });
+
+      it('rejects answers that are not valid for the step', async () => {
+        const { repository, userId } = await fresh();
+        await expect(
+          repository.saveStep(userId, 'minimum', { minimumDaySize: 9 }),
+        ).rejects.toThrow();
+      });
+
+      it('stores a draft week and reads it back unchanged', async () => {
+        const { repository, userId } = await fresh();
+        const { profile } = await repository.getOnboarding(userId);
+        const week = generateFirstWeek(profile, { startDate: DAY, timeZone: ZONE });
+
+        const id = await repository.saveDraftWeek(userId, week);
+        const latest = await repository.getLatestDraft(userId);
+
+        expect(latest?.id).toBe(id);
+        expect(latest?.draft.days).toHaveLength(7);
+        expect(latest?.draft.notes.length).toBeGreaterThan(0);
+      });
+
+      it('writes nothing until the draft is accepted', async () => {
+        const { repository, userId } = await fresh();
+        const { profile } = await repository.getOnboarding(userId);
+        await repository.saveDraftWeek(
+          userId,
+          generateFirstWeek(profile, { startDate: DAY, timeZone: ZONE }),
+        );
+
+        expect(await repository.getDay(userId, DAY)).toBeNull();
+      });
+
+      it('turns an accepted draft into real days and finishes onboarding', async () => {
+        const { repository, userId } = await fresh();
+        const { profile } = await repository.getOnboarding(userId);
+        const week = generateFirstWeek(profile, { startDate: DAY, timeZone: ZONE });
+        const id = await repository.saveDraftWeek(userId, week);
+
+        await repository.acceptDraft(userId, id, new Date('2026-03-16T07:00:00.000Z'));
+
+        const day = await repository.getDay(userId, DAY);
+        expect(day).not.toBeNull();
+        expect(day?.commitments.length).toBe(week.days[0]?.items.length);
+        expect(day?.commitments.some((commitment) => commitment.isMinimum)).toBe(true);
+        expect(day?.commitments.every((commitment) => commitment.status === 'pending')).toBe(true);
+
+        const days = await repository.listDays(userId, { from: DAY, to: '2026-03-22' });
+        expect(days).toHaveLength(7);
+
+        const state = await repository.getOnboarding(userId);
+        expect(state.progress.completedAt).not.toBeNull();
+      });
+
+      it("refuses to accept a draft that is not this account's", async () => {
+        const { repository, userId } = await fresh();
+        await expect(
+          repository.acceptDraft(userId, '00000000-0000-4000-8000-0000000000ff', new Date()),
+        ).rejects.toThrow();
+      });
     });
 
     it('deletes everything, and means it', async () => {

@@ -2,7 +2,7 @@
 
 The schema, and the reasoning behind it.
 
-**Source of truth:** `supabase/migrations/` — ten files, applied in order, 37 tables.
+**Source of truth:** `supabase/migrations/` — eleven files, applied in order, 43 tables.
 **Proof:** `src/persistence/rls.test.ts` applies them from zero to a real Postgres and tries
 to break the isolation. `src/persistence/sql-repository.test.ts` holds the production SQL to
 the same contract as the demo adapter, through the policies.
@@ -146,7 +146,7 @@ repository. The seed is idempotent: running it twice changes nothing, and a test
 - **No Supabase project exists yet.** Everything here is proven against an in-process
   Postgres; the migrations have not been applied to a hosted database. See
   `PROJECT_LEDGER.md` §8 for exactly what that needs.
-- **Repositories exist for days and focus sessions only.** The other 30-odd tables have
+- **Repositories exist for days, focus sessions and onboarding only.** The other tables have
   schema, policies and tests, but their repositories arrive with the modules that use them.
   That is deliberate: an interface written before its screen is an interface written twice.
 - **No migration runner with a version table.** `npm run db:migrate` replays every file, which

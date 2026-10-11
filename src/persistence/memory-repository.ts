@@ -1,4 +1,16 @@
-import type { Commitment, Day, DayMark, IsoDate } from '@/domain';
+import {
+  ONBOARDING_STEPS,
+  onboardingProfileSchema,
+  parseStepAnswers,
+  type AnswerableStep,
+  type Commitment,
+  type Day,
+  type DayMark,
+  type DraftWeek,
+  type IsoDate,
+  type OnboardingProgress,
+  type OnboardingStep,
+} from '@/domain';
 import { demoDays } from './demo-data';
 import {
   RecordNotFoundError,
@@ -10,9 +22,16 @@ import {
   type UpsertDayInput,
 } from './repository';
 
+interface OnboardingRecord {
+  answers: Record<string, unknown>;
+  progress: OnboardingProgress;
+}
+
 interface MemoryState {
   days: Map<string, Day>;
   focus: Map<string, FocusSession>;
+  onboarding: Map<string, OnboardingRecord>;
+  drafts: Map<string, { id: string; userId: string; draft: DraftWeek; acceptedAt: string | null }>;
 }
 
 function key(userId: string, localDate: IsoDate): string {
@@ -34,7 +53,12 @@ export function createMemoryRepository(
   seedUserId: string,
   seed: readonly Day[] = demoDays,
 ): AreteRepository {
-  const state: MemoryState = { days: new Map(), focus: new Map() };
+  const state: MemoryState = {
+    days: new Map(),
+    focus: new Map(),
+    onboarding: new Map(),
+    drafts: new Map(),
+  };
 
   for (const day of seed) {
     state.days.set(key(seedUserId, day.date), structuredClone(day) as Day);
@@ -51,8 +75,115 @@ export function createMemoryRepository(
     return structuredClone(day) as Day;
   }
 
+  function onboardingFor(userId: string): OnboardingRecord {
+    let record = state.onboarding.get(userId);
+    if (!record) {
+      record = {
+        answers: {},
+        progress: {
+          currentStep: 'intent',
+          completedSteps: [],
+          skippedSteps: [],
+          completedAt: null,
+        },
+      };
+      state.onboarding.set(userId, record);
+    }
+    return record;
+  }
+
+  function onboardingState(userId: string) {
+    const record = onboardingFor(userId);
+    return {
+      progress: { ...record.progress },
+      profile: onboardingProfileSchema.parse(record.answers),
+    };
+  }
+
+  function advance(record: OnboardingRecord, step: OnboardingStep, skipped: boolean): void {
+    const completed = new Set(record.progress.completedSteps);
+    const skippedSet = new Set(record.progress.skippedSteps);
+    if (skipped) {
+      skippedSet.add(step);
+      completed.delete(step);
+    } else {
+      completed.add(step);
+      skippedSet.delete(step);
+    }
+
+    const index = ONBOARDING_STEPS.indexOf(step);
+    const next = ONBOARDING_STEPS[index + 1] ?? 'review';
+
+    record.progress = {
+      ...record.progress,
+      currentStep: next,
+      completedSteps: [...completed],
+      skippedSteps: [...skippedSet],
+    };
+  }
+
   return {
     kind: 'memory',
+
+    async getOnboarding(userId: string) {
+      return onboardingState(userId);
+    },
+
+    async saveStep(userId: string, step: AnswerableStep, answers: unknown) {
+      const record = onboardingFor(userId);
+      record.answers = { ...record.answers, [step]: parseStepAnswers(step, answers) };
+      advance(record, step, false);
+      return onboardingState(userId);
+    },
+
+    async skipStep(userId: string, step: OnboardingStep) {
+      const record = onboardingFor(userId);
+      advance(record, step, true);
+      return onboardingState(userId);
+    },
+
+    async saveDraftWeek(userId: string, draft: DraftWeek) {
+      const id = `draft-${state.drafts.size + 1}`;
+      state.drafts.set(id, { id, userId, draft, acceptedAt: null });
+      return id;
+    },
+
+    async getLatestDraft(userId: string) {
+      const mine = [...state.drafts.values()].filter((entry) => entry.userId === userId);
+      const latest = mine[mine.length - 1];
+      return latest ? { id: latest.id, draft: latest.draft } : null;
+    },
+
+    async acceptDraft(userId: string, draftId: string, at: Date) {
+      const entry = state.drafts.get(draftId);
+      if (!entry || entry.userId !== userId) {
+        throw new RecordNotFoundError(`No draft ${draftId} for this account`);
+      }
+
+      for (const day of entry.draft.days) {
+        const commitments: Commitment[] = day.items.map((item, index) => ({
+          id: `${day.date}-${index + 1}`,
+          kind: item.kind,
+          title: item.title,
+          isMinimum: item.isMinimum,
+          status: 'pending',
+        }));
+        state.days.set(key(userId, day.date), {
+          date: day.date,
+          mark: 'normal',
+          committedAt: null,
+          commitments,
+        });
+      }
+
+      entry.acceptedAt = at.toISOString();
+      const record = onboardingFor(userId);
+      record.progress = {
+        ...record.progress,
+        currentStep: 'review',
+        completedAt: at.toISOString(),
+      };
+    },
 
     async getTimeZone() {
       // The demo account lives in one place, so screenshots are reproducible.

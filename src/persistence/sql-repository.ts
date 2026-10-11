@@ -1,4 +1,16 @@
-import type { Commitment, Day, DayMark, IsoDate } from '@/domain';
+import {
+  ONBOARDING_STEPS,
+  onboardingProfileSchema,
+  parseStepAnswers,
+  type AnswerableStep,
+  type Commitment,
+  type Day,
+  type DayMark,
+  type DraftWeek,
+  type IsoDate,
+  type OnboardingProgress,
+  type OnboardingStep,
+} from '@/domain';
 import {
   RecordNotFoundError,
   type AccountExport,
@@ -97,8 +109,306 @@ export function createSqlRepository(executor: SqlExecutor): AreteRepository {
     return day;
   }
 
+  // ---------------------------------------------------------------------
+  // Onboarding
+  // ---------------------------------------------------------------------
+  //
+  // Answers are stored twice, on purpose. `onboarding_answers` keeps the raw
+  // response so the flow can be resumed and revisited without interpretation;
+  // the typed profile tables hold the handful of facts that actually gate
+  // behaviour, because a safety rule must never read a key out of a json blob.
+  async function projectStep(
+    userId: string,
+    step: AnswerableStep,
+    answers: Record<string, unknown>,
+  ): Promise<void> {
+    switch (step) {
+      case 'schedule':
+        await executor.query(
+          `update public.preferences
+              set planning_style = $2, available_weekdays = $3,
+                  weekday_constraint = $4, wake_time = $5, sleep_time = $6
+            where user_id = $1`,
+          [
+            userId,
+            answers['planningStyle'],
+            answers['availableWeekdays'],
+            answers['weekdayConstraint'],
+            answers['wakeTime'] ?? null,
+            answers['sleepTime'] ?? null,
+          ],
+        );
+        break;
+
+      case 'training':
+        await executor.query(
+          `insert into public.training_profile
+             (user_id, experience, recent_activity, desired_outcomes, equipment,
+              session_minutes, preferred_weekdays)
+           values ($1, $2, $3, $4, $5, $6, $7)
+           on conflict (user_id) do update set
+             experience = excluded.experience, recent_activity = excluded.recent_activity,
+             desired_outcomes = excluded.desired_outcomes, equipment = excluded.equipment,
+             session_minutes = excluded.session_minutes,
+             preferred_weekdays = excluded.preferred_weekdays`,
+          [
+            userId,
+            answers['experience'],
+            answers['recentActivity'],
+            answers['desiredOutcomes'],
+            answers['equipment'],
+            answers['sessionMinutes'],
+            answers['preferredWeekdays'],
+          ],
+        );
+        break;
+
+      case 'health':
+        await executor.query(
+          `insert into public.health_profile
+             (user_id, pregnancy_status, cardiovascular_or_fainting_history,
+              heat_sensitivity, cold_sensitivity, medical_clearance_needed,
+              medical_clearance_confirmed_at, injuries, mobility_limitations)
+           values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
+           on conflict (user_id) do update set
+             pregnancy_status = excluded.pregnancy_status,
+             cardiovascular_or_fainting_history = excluded.cardiovascular_or_fainting_history,
+             heat_sensitivity = excluded.heat_sensitivity,
+             cold_sensitivity = excluded.cold_sensitivity,
+             medical_clearance_needed = excluded.medical_clearance_needed,
+             medical_clearance_confirmed_at = excluded.medical_clearance_confirmed_at,
+             injuries = excluded.injuries,
+             mobility_limitations = excluded.mobility_limitations`,
+          [
+            userId,
+            answers['pregnancyStatus'],
+            answers['cardiovascularOrFaintingHistory'],
+            answers['heatSensitivity'],
+            answers['coldSensitivity'],
+            answers['medicalClearanceNeeded'],
+            answers['medicalClearanceConfirmed'] === true ? new Date().toISOString() : null,
+            JSON.stringify(answers['injuries'] ?? []),
+            answers['mobilityLimitations'] ?? null,
+          ],
+        );
+        break;
+
+      case 'food':
+        await executor.query(
+          `insert into public.nutrition_profile
+             (user_id, logging_goal, hide_calorie_numbers, dietary_preferences, allergies)
+           values ($1, $2, $3, $4, $5)
+           on conflict (user_id) do update set
+             logging_goal = excluded.logging_goal,
+             hide_calorie_numbers = excluded.hide_calorie_numbers,
+             dietary_preferences = excluded.dietary_preferences,
+             allergies = excluded.allergies`,
+          [
+            userId,
+            answers['loggingGoal'],
+            answers['hideCalorieNumbers'],
+            answers['dietaryPreferences'],
+            answers['allergies'],
+          ],
+        );
+        await executor.query(`update public.preferences set unit_system = $2 where user_id = $1`, [
+          userId,
+          answers['unitSystem'],
+        ]);
+        break;
+
+      case 'mind':
+        await executor.query(
+          `insert into public.mind_profile
+             (user_id, meditation_experience, breathwork_experience, chosen_pack_slugs)
+           values ($1, $2, $3, $4)
+           on conflict (user_id) do update set
+             meditation_experience = excluded.meditation_experience,
+             breathwork_experience = excluded.breathwork_experience,
+             chosen_pack_slugs = excluded.chosen_pack_slugs`,
+          [
+            userId,
+            answers['meditationExperience'],
+            answers['breathworkExperience'],
+            answers['chosenPackSlugs'],
+          ],
+        );
+        break;
+
+      case 'age':
+        await executor.query(
+          `update public.profiles
+              set birth_year = $2,
+                  guardian_confirmed_at = case when $3 then coalesce(guardian_confirmed_at, now()) else null end
+            where id = $1`,
+          [userId, answers['birthYear'] ?? null, answers['guardianConfirmed'] === true],
+        );
+        break;
+
+      case 'minimum':
+        await executor.query(
+          `update public.preferences set minimum_day_size = $2 where user_id = $1`,
+          [userId, answers['minimumDaySize']],
+        );
+        break;
+
+      case 'intent':
+        // Goals become rows when the Plan module is built. Until then the
+        // answer lives in onboarding_answers rather than being half-modelled.
+        break;
+    }
+  }
+
+  async function loadOnboarding(userId: string) {
+    await executor.query(
+      `insert into public.onboarding_progress (user_id) values ($1)
+       on conflict (user_id) do nothing`,
+      [userId],
+    );
+    await executor.query(
+      `insert into public.preferences (user_id) values ($1) on conflict (user_id) do nothing`,
+      [userId],
+    );
+
+    const progressRows = await executor.query<{
+      current_step: OnboardingStep;
+      completed_steps: OnboardingStep[];
+      skipped_steps: OnboardingStep[];
+      completed_at: string | null;
+    }>(
+      `select current_step, completed_steps, skipped_steps, completed_at
+         from public.onboarding_progress where user_id = $1`,
+      [userId],
+    );
+
+    const answerRows = await executor.query<{ step: string; answer: Record<string, unknown> }>(
+      `select step, answer from public.onboarding_answers where user_id = $1`,
+      [userId],
+    );
+
+    const answers: Record<string, unknown> = {};
+    for (const row of answerRows.rows) answers[row.step] = row.answer;
+
+    const row = progressRows.rows[0];
+    const progress: OnboardingProgress = {
+      currentStep: row?.current_step ?? 'intent',
+      completedSteps: row?.completed_steps ?? [],
+      skippedSteps: row?.skipped_steps ?? [],
+      completedAt: row?.completed_at ?? null,
+    };
+
+    return { progress, profile: onboardingProfileSchema.parse(answers) };
+  }
+
+  async function advance(userId: string, step: OnboardingStep, skipped: boolean): Promise<void> {
+    const index = ONBOARDING_STEPS.indexOf(step);
+    const next = ONBOARDING_STEPS[index + 1] ?? 'review';
+
+    await executor.query(
+      `update public.onboarding_progress
+          set current_step = $2,
+              completed_steps = case when $4 then array_remove(completed_steps, $3)
+                                     else (select array_agg(distinct s) from unnest(completed_steps || array[$3]) s) end,
+              skipped_steps = case when $4 then (select array_agg(distinct s) from unnest(skipped_steps || array[$3]) s)
+                                   else array_remove(skipped_steps, $3) end
+        where user_id = $1`,
+      [userId, next, step, skipped],
+    );
+  }
+
   return {
     kind: 'sql',
+
+    async getOnboarding(userId: string) {
+      return loadOnboarding(userId);
+    },
+
+    async saveStep(userId: string, step: AnswerableStep, answers: unknown) {
+      const parsed = parseStepAnswers(step, answers) as Record<string, unknown>;
+
+      await executor.query(
+        `insert into public.onboarding_answers (user_id, step, answer)
+         values ($1, $2, $3::jsonb)
+         on conflict (user_id, step) do update set answer = excluded.answer, answered_at = now()`,
+        [userId, step, JSON.stringify(parsed)],
+      );
+
+      await loadOnboarding(userId);
+      await projectStep(userId, step, parsed);
+      await advance(userId, step, false);
+      return loadOnboarding(userId);
+    },
+
+    async skipStep(userId: string, step: OnboardingStep) {
+      await loadOnboarding(userId);
+      await advance(userId, step, true);
+      return loadOnboarding(userId);
+    },
+
+    async saveDraftWeek(userId: string, draft: DraftWeek) {
+      const rows = await executor.query<{ id: string }>(
+        `insert into public.plan_drafts (user_id, starts_on, timezone, draft)
+         values ($1, $2, $3, $4::jsonb) returning id`,
+        [userId, draft.startsOn, draft.timeZone, JSON.stringify(draft)],
+      );
+      const id = rows.rows[0]?.id;
+      if (!id) throw new Error('plan_drafts insert returned no row');
+      return id;
+    },
+
+    async getLatestDraft(userId: string) {
+      const rows = await executor.query<{ id: string; draft: DraftWeek }>(
+        `select id, draft from public.plan_drafts
+          where user_id = $1 order by created_at desc limit 1`,
+        [userId],
+      );
+      const row = rows.rows[0];
+      return row ? { id: row.id, draft: row.draft } : null;
+    },
+
+    async acceptDraft(userId: string, draftId: string, at: Date) {
+      const rows = await executor.query<{ draft: DraftWeek }>(
+        `select draft from public.plan_drafts where user_id = $1 and id = $2`,
+        [userId, draftId],
+      );
+      const draft = rows.rows[0]?.draft;
+      if (!draft) throw new RecordNotFoundError(`No draft ${draftId} for this account`);
+
+      for (const day of draft.days) {
+        const plans = await executor.query<{ id: string }>(
+          `insert into public.daily_plans (user_id, local_date, timezone)
+           values ($1, $2, $3)
+           on conflict (user_id, local_date) do update set timezone = excluded.timezone
+           returning id`,
+          [userId, day.date, draft.timeZone],
+        );
+        const planId = plans.rows[0]?.id;
+        if (!planId) continue;
+
+        for (const [index, item] of day.items.entries()) {
+          await executor.query(
+            `insert into public.daily_plan_items
+               (user_id, daily_plan_id, kind, title_snapshot, is_minimum, position)
+             select $1, $2, $3, $4, $5, $6
+              where not exists (
+                select 1 from public.daily_plan_items
+                 where user_id = $1 and daily_plan_id = $2 and title_snapshot = $4
+              )`,
+            [userId, planId, item.kind, item.title, item.isMinimum, index],
+          );
+        }
+      }
+
+      await executor.query(
+        `update public.plan_drafts set accepted_at = $3 where user_id = $1 and id = $2`,
+        [userId, draftId, at.toISOString()],
+      );
+      await executor.query(
+        `update public.onboarding_progress set completed_at = $2, current_step = 'review'
+          where user_id = $1`,
+        [userId, at.toISOString()],
+      );
+    },
 
     async getTimeZone(userId) {
       const rows = await executor.query<{ timezone: string }>(

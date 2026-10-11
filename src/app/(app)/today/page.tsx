@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { getCurrentUser } from '@/auth';
 import { DemoBadge } from '@/components/demo-badge';
 import {
@@ -51,6 +52,28 @@ function longDate(iso: string): string {
     month: 'long',
     timeZone: 'UTC',
   });
+}
+
+/**
+ * The nudge towards onboarding — a real link to a real flow, shown only while
+ * it is still unfinished, and never a wall in front of the app.
+ */
+function SetUpFirstWeek({ onboarded }: { onboarded: boolean }) {
+  if (onboarded) return null;
+
+  return (
+    <Section
+      title="Set up your first week"
+      hint="Four minutes, every question skippable, and nothing is saved until you have seen the whole week."
+    >
+      <Link
+        href="/onboarding"
+        className="inline-flex min-h-11 items-center rounded-full bg-accent px-5 text-body font-medium text-on-accent"
+      >
+        Start
+      </Link>
+    </Section>
+  );
 }
 
 function MinimumDay({ progress }: { progress: DayProgress }) {
@@ -126,12 +149,24 @@ export default async function TodayPage() {
   }
 
   // The day is the user's local day, in the zone their account records in —
-  // never the server's. The demo account is pinned to its fixed sample day so
-  // that screenshots and tests keep agreeing.
-  const { day, timeZone } = await withUser(user.id, async (repository) => {
+  // never the server's.
+  const { day, timeZone, onboarded } = await withUser(user.id, async (repository) => {
     const zone = await repository.getTimeZone(user.id);
-    const date = user.isDemo ? DEMO_TODAY : toLocalDate(new Date(), zone);
-    return { day: await repository.getDay(user.id, date), timeZone: zone };
+    const { progress } = await repository.getOnboarding(user.id);
+    const today = toLocalDate(new Date(), zone);
+
+    // Once a plan has been accepted, today is today. Before that, the demo
+    // account falls back to its fixed sample day so that screenshots and tests
+    // keep agreeing on what Today looks like.
+    const real = await repository.getDay(user.id, today);
+    const fallback =
+      real === null && user.isDemo ? await repository.getDay(user.id, DEMO_TODAY) : null;
+
+    return {
+      day: real ?? fallback,
+      timeZone: zone,
+      onboarded: progress.completedAt !== null,
+    };
   });
 
   if (!day) {
@@ -141,10 +176,7 @@ export default async function TodayPage() {
           eyebrow={longDate(toLocalDate(new Date(), timeZone))}
           title="Nothing planned yet."
         />
-        <EmptyState
-          title="Pick one thing."
-          body="A day with one thing on it still counts. Planning arrives in stage 6."
-        />
+        <SetUpFirstWeek onboarded={onboarded} />
       </div>
     );
   }
@@ -159,6 +191,7 @@ export default async function TodayPage() {
         meta={<DemoBadge />}
       />
 
+      {onboarded ? null : <SetUpFirstWeek onboarded={onboarded} />}
       <MinimumDay progress={progress} />
       <Commitments day={day} progress={progress} />
 

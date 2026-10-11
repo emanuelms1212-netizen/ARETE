@@ -1,4 +1,13 @@
-import type { Day, DayMark, IsoDate } from '@/domain';
+import type {
+  AnswerableStep,
+  Day,
+  DayMark,
+  DraftWeek,
+  IsoDate,
+  OnboardingProfile,
+  OnboardingProgress,
+  OnboardingStep,
+} from '@/domain';
 
 /**
  * The persistence contract.
@@ -79,6 +88,28 @@ export interface ProfileRepository {
   getTimeZone(userId: string): Promise<string>;
 }
 
+export interface OnboardingState {
+  readonly progress: OnboardingProgress;
+  /** Answers given so far, with the conservative defaults filling the rest. */
+  readonly profile: OnboardingProfile;
+}
+
+export interface OnboardingRepository {
+  getOnboarding(userId: string): Promise<OnboardingState>;
+  /** Saves one step's answers. Resumable: the flow can be left at any point. */
+  saveStep(userId: string, step: AnswerableStep, answers: unknown): Promise<OnboardingState>;
+  /** Skipping is a real answer — it means "use the conservative default". */
+  skipStep(userId: string, step: OnboardingStep): Promise<OnboardingState>;
+  /** Stores the generated week for review. Returns its id. */
+  saveDraftWeek(userId: string, draft: DraftWeek): Promise<string>;
+  getLatestDraft(userId: string): Promise<{ id: string; draft: DraftWeek } | null>;
+  /**
+   * Turns the reviewed draft into real days and finishes onboarding.
+   * Nothing the user saw is written before this is called.
+   */
+  acceptDraft(userId: string, draftId: string, at: Date): Promise<void>;
+}
+
 export interface DayRepository {
   getDay(userId: string, localDate: IsoDate): Promise<Day | null>;
   listDays(userId: string, range: { from: IsoDate; to: IsoDate }): Promise<readonly Day[]>;
@@ -101,7 +132,12 @@ export interface AccountRepository {
 }
 
 export interface AreteRepository
-  extends ProfileRepository, DayRepository, FocusSessionRepository, AccountRepository {
+  extends
+    ProfileRepository,
+    OnboardingRepository,
+    DayRepository,
+    FocusSessionRepository,
+    AccountRepository {
   readonly kind: 'memory' | 'sql';
 }
 

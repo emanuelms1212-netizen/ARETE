@@ -305,7 +305,111 @@ travel; and the three Today metrics wrapped 2-then-1, so they became a three-col
       their screens. An interface written before its screen is an interface written twice.
 - [ ] Migration ledger table — needed before the first production deploy.
 
-## Stages 5–17 — not started
+## Stage 5 — Onboarding and the adaptive plan engine
 
-Tracked in `docs/PROJECT_LEDGER.md` §8. No item below stage 5 may be ticked before the
+### The questions
+
+- [x] Nine steps, eight of which ask something — `ONBOARDING_STEPS`
+- [x] Every step says **why it is being asked**, in its own words — `STEP_RATIONALE`, asserted
+      end to end on the health step
+- [x] Every step is skippable, and skipping is as reachable as continuing
+- [x] Onboarding can be left entirely at any point — "Do this later" in the header, asserted
+      end to end
+- [x] The flow is resumable: leaving and returning lands on the step the user left
+- [x] A skipped step produces a **conservative answer**, not a missing one — Zod `.prefault({})`,
+      asserted for every step by the `skipped` persona
+- [x] Answers can be changed after the fact; the later week reflects the change
+- [x] Invalid answers are rejected by the same schema the generator reads
+- [x] Visible position in the flow — `role="progressbar"` with an accessible name
+- [x] The minimum-viable-day question is asked last, and asked plainly
+
+### Safety — rules that only tighten
+
+- [x] Seven gated modules: cold exposure, contrast therapy, sauna, loaded mobility, high
+      intensity, calorie targets, fasting
+- [x] Decisions are ranked and may only tighten — the strictest rule wins, asserted
+- [x] Pregnancy or postpartum blocks heat, cold and fasting; reroutes loading and intensity
+- [x] A heart condition or a history of fainting blocks immersion and sauna
+- [x] Heat and cold intolerance are separate answers — one never implies the other
+- [x] Severe injury blocks loaded mobility; moderate injury reroutes to easier versions
+- [x] Awaiting medical clearance keeps week one light
+- [x] A user under 18 without guardian confirmation gets **no calorie targets and no fasting**
+- [x] The age rule is enforced **in the database too** — a trigger rejects the row
+- [x] "Prefer not to say" raises a safety notice and is **deliberately not blocked** — D31
+- [x] Every gated decision carries a reason the user can read
+
+### The generated week
+
+- [x] `generateFirstWeek` is pure: no clock, no database, no randomness — same answers, same week
+- [x] Never more than **four training days** in week one, whatever the answers say
+- [x] Never more than **three habits**
+- [x] At least one quiet day, labelled as part of the plan rather than a gap
+- [x] Training days are spread, not back to back
+- [x] Every day has a **minimum version**, and the smallest eligible item is chosen — a
+      thirty-minute workout is never the sole minimum when a five-minute sit exists
+- [x] **Every item carries a reason**, and a test fails any reason under fifteen characters
+      or containing `undefined`
+- [x] No generated title names its own duration — `minutes` is rendered beside it
+- [x] Nine personas produce **pairwise distinct** weeks — asserted, so the engine is not
+      quietly ignoring its inputs
+- [x] Contrast therapy is scheduled only if chosen, and only where safety allows
+
+### Nothing is written until the user agrees
+
+- [x] The generated week is a `plan_drafts` row, not a plan
+- [x] Reaching review and leaving writes **no days** — asserted in the contract suite
+- [x] Accepting turns the draft into seven real days with their items
+- [x] The **edited** draft is stored before acceptance, beside the generated one
+- [x] A draft belonging to another user is refused
+- [x] Every item on the review screen can be removed, restored, or promoted to the minimum
+- [x] "Why is this here?" is available per item, and closed by default
+
+### Persistence and authorization
+
+- [x] Migration `0011_onboarding.sql` — six new tables, applying from zero
+- [x] Row-level security enabled **and forced** on all six, with policies
+- [x] `user_owned_tables()` rewritten, so export and deletion reach the new tables
+- [x] Onboarding implemented by **both** repository adapters, against the one contract suite
+- [x] Raw answers are kept _and_ projected into the typed profile tables
+- [x] Server actions re-read the user from the session; none takes a user id from the client
+- [x] `/today` resolves the user's real local date, and offers the first week until
+      onboarding completes
+
+### Verification
+
+- [x] `npm test` — **374** unit, component and database tests (112 of them the plan engine)
+- [x] `npm run e2e` — **50** end-to-end tests, at phone and desktop widths, against a
+      production build
+- [x] Format, lint, typecheck and build all clean
+- [x] Screenshots captured **and inspected** at 390×844 and 1440×900 for all nine screens
+- [x] The dev-server log was read during a green E2E run — which is how the
+      `revalidatePath`-during-render bug was found (D38)
+- [x] A flaky launcher test was fixed rather than retried away
+
+### Fixed because a screenshot showed it
+
+- [x] The health and minimum steps each said the same thing twice — rationale rewritten
+- [x] Every timed item read its duration twice ("Mobility · 10 min 10 min") — durations
+      removed from titles, with a test to keep them out
+- [x] The review screen's save bar was translucent over dense content — now opaque
+- [x] The review screen ignored desktop width — now two columns, with the actions on one row
+- [x] `Switch` used a native checkbox and inherited the browser's blue — now drawn to match
+      the radios beside it
+
+### Not done, and why
+
+- [ ] **Migrations applied to a hosted database** — still no Supabase project.
+      `PROJECT_LEDGER.md` §8. It did not block this stage.
+- [ ] **The sign-in screen** — there is nothing to sign in to until the project exists.
+- [ ] **Clinical review of the safety rules** — the rules are written, conservative and
+      tested, by an engineer. A professional has not signed them off. Blocks launch, not
+      stage 6.
+- [ ] **Week two onward** — adaptation needs completion history, which nothing records yet.
+- [ ] **Programme selection** — the packs are offered in the mind step; starting one with
+      editable parameters is still ahead.
+- [ ] Repositories for `habits`, `habit_schedules` and `tasks` — stage 6, with their screens.
+
+## Stages 6–17 — not started
+
+Tracked in `docs/PROJECT_LEDGER.md` §8. No item below stage 6 may be ticked before the
 stage that builds it has run and been verified.

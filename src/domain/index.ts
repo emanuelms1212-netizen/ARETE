@@ -51,3 +51,53 @@ export {
 } from './units';
 export type { Measured, UnitSystem } from './units';
 export { clientToken, focusSessionToken, habitLogToken, workoutSetToken } from './idempotency';
+export {
+  ONBOARDING_STEPS,
+  STEP_RATIONALE,
+  FOCUS_AREAS,
+  EQUIPMENT,
+  BODY_REGIONS,
+  completionRatio,
+  defaultProfile,
+  isAnswerableStep,
+  nextStep,
+  onboardingProfileSchema,
+  parseStepAnswers,
+  previousStep,
+} from './onboarding';
+export type {
+  AgeAnswers,
+  AnswerableStep,
+  BodyRegion,
+  FocusArea,
+  FoodAnswers,
+  HealthAnswers,
+  Injury,
+  IntentAnswers,
+  MindAnswers,
+  MinimumAnswers,
+  OnboardingProfile,
+  OnboardingProgress,
+  OnboardingStep,
+  ScheduleAnswers,
+  TrainingAnswers,
+} from './onboarding';
+export {
+  SAFETY_MODULES,
+  decisionFor,
+  evaluateSafety,
+  isAllowed,
+  isBlocked,
+  isMinor,
+  notableDecisions,
+} from './safety';
+export type { SafetyDecision, SafetyModule, SafetyOutcome, SafetyReport } from './safety';
+export { countDays, generateFirstWeek, weeklyMinutes } from './plan-generator';
+export type {
+  DayShape,
+  DraftDay,
+  DraftHabit,
+  DraftWeek,
+  GenerateOptions,
+  PlanItem,
+} from './plan-generator';

@@ -18,12 +18,16 @@ that runs against a real Postgres and actually tries to read another user's data
 reads the signed-in user's own local day through a repository interface with two
 interchangeable implementations.
 
+Onboarding asks eight skippable questions and generates a first week from the answers —
+capped, explained item by item, and saved only once the user has edited it and agreed.
+
 The product modules are still not built — Plan, Train and Progress render an honest "not
-built yet" state naming the stage that builds them. Two things that do work are shown
-working and labelled: the focus timer on Today, and the breathing pacer on Mind.
+built yet" state naming the stage that builds them. Three things that do work are shown
+working and labelled: the focus timer on Today, the breathing pacer on Mind, and onboarding.
 
 See `docs/PROJECT_LEDGER.md` for where the build stands and what comes next,
-`docs/DATA_MODEL.md` for the schema and the reasoning behind it, and
+`docs/DATA_MODEL.md` for the schema and the reasoning behind it,
+`docs/PLAN_ENGINE.md` for how answers become a week, and
 `docs/DESIGN_SYSTEM.md` for the visual system.
 
 ## Requirements

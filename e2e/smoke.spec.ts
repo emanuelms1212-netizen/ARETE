@@ -142,8 +142,15 @@ test.describe('command launcher', () => {
   test('opens with the keyboard shortcut and navigates', async ({ page }) => {
     await page.goto('/today');
 
-    await page.keyboard.press('ControlOrMeta+k');
     const search = page.getByRole('searchbox', { name: 'Search destinations' });
+
+    // The shortcut only works once the launcher has hydrated, and nothing on the
+    // page announces that moment. Press until it takes rather than racing it.
+    await expect(async () => {
+      await page.keyboard.press('ControlOrMeta+k');
+      await expect(search).toBeVisible({ timeout: 1000 });
+    }).toPass({ timeout: 10_000 });
+
     await expect(search).toBeFocused();
 
     await search.fill('progress');
@@ -188,5 +195,83 @@ test.describe('styleguide', () => {
   test('is not reachable in a production build', async ({ page }) => {
     const response = await page.goto('/styleguide');
     expect(response?.status()).toBe(404);
+  });
+});
+
+test.describe('onboarding', () => {
+  // Demo mode keeps its state in the server process, so these run in order and
+  // the one that finishes the flow runs last.
+  test.describe.configure({ mode: 'serial' });
+
+  test('sends you to wherever you got to', async ({ page }) => {
+    await page.goto('/onboarding');
+    // Either the first step, or the review if this browser already finished.
+    await expect(page).toHaveURL(
+      /\/onboarding\/(intent|schedule|training|health|food|mind|age|minimum|review)$/,
+    );
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  });
+
+  test('says why it is asking, on the step that matters most', async ({ page }) => {
+    await page.goto('/onboarding/health');
+
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+      /Anything ARETE should not suggest/i,
+    );
+    await expect(
+      page.getByText(/none of this is a diagnosis and none of it is shared/i),
+    ).toBeVisible();
+  });
+
+  test('shows progress and can always be left', async ({ page }) => {
+    await page.goto('/onboarding/training');
+
+    await expect(page.getByRole('progressbar', { name: 'Onboarding progress' })).toBeVisible();
+    await page.getByRole('link', { name: 'Do this later' }).click();
+    await expect(page).toHaveURL(/\/today$/);
+  });
+
+  test('every step can be skipped', async ({ page }) => {
+    await page.goto('/onboarding/food');
+    await page.getByRole('button', { name: 'Skip this' }).click();
+    await expect(page).toHaveURL(/\/onboarding\/mind$/);
+  });
+
+  test('offers only the packs you tick, and says so', async ({ page }) => {
+    await page.goto('/onboarding/mind');
+    await expect(page.getByText(/Nothing here is ever added for you/i)).toBeVisible();
+  });
+
+  test('warns a minor that no calorie target will be generated', async ({ page }) => {
+    await page.goto('/onboarding/age');
+
+    await page.getByLabel('Year of birth').fill('2012');
+    await expect(page.getByText(/will not generate calorie targets/i)).toBeVisible();
+    await expect(page.getByLabel(/parent, guardian or clinician has agreed/i)).toBeVisible();
+  });
+
+  test('completes the flow and writes the week', async ({ page }) => {
+    await page.goto('/onboarding/minimum');
+    await page.getByRole('button', { name: 'See my first week' }).click();
+
+    await expect(page).toHaveURL(/\/onboarding\/review$/);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Nothing is saved yet/i);
+
+    // Seven days, each a titled section.
+    await expect(page.getByText(/At a glance/i)).toBeVisible();
+    await expect(page.getByText(/deliberately lighter/i)).toBeVisible();
+
+    // Every item can explain itself.
+    const why = page.getByRole('button', { name: 'Why is this here?' }).first();
+    await why.click();
+    await expect(page.getByRole('button', { name: 'Hide why' }).first()).toBeVisible();
+
+    // And can be removed before anything is saved.
+    await page.getByRole('button', { name: 'Remove' }).first().click();
+    await expect(page.getByRole('button', { name: 'Put back' }).first()).toBeVisible();
+
+    await page.getByRole('button', { name: 'Save this week' }).click();
+    await expect(page).toHaveURL(/\/today$/);
+    await expect(page.getByText('Minimum day')).toBeVisible();
   });
 });

@@ -18,6 +18,17 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
   use: {
+    // CI downloads Playwright's own Chromium. The sandbox this suite is run in
+    // cannot reach `cdn.playwright.dev` and has one preinstalled instead, so it
+    // points at that rather than carrying an uncommittable local patch.
+    ...(process.env.PLAYWRIGHT_CHROMIUM_PATH
+      ? {
+          launchOptions: {
+            executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH,
+            args: ['--no-sandbox'],
+          },
+        }
+      : {}),
     baseURL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',

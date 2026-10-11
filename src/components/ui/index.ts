@@ -2,6 +2,8 @@ export { Button } from './button';
 export type { ButtonProps } from './button';
 export { BreathingRing } from './breathing-ring';
 export { Card } from './card';
+export { ChoiceChips, ChoiceList, Switch } from './choice';
+export type { Choice } from './choice';
 export type { CardProps } from './card';
 export { ConfirmDialog, Dialog } from './dialog';
 export { FocusTimer } from './focus-timer';

@@ -4,7 +4,7 @@ The running record of what ARETE is, what has been decided, and what happens nex
 Updated at the end of every stage.
 
 **Last updated:** 2026-10-10
-**Stage:** 4 of 17 — data model, authentication and reliable persistence
+**Stage:** 5 of 17 — onboarding and the adaptive plan engine
 **Branch:** `build/prompt-pack-v1`
 **Repository:** `emanuelms1212-netizen/ARETE`
 
@@ -29,7 +29,7 @@ at the end of every stage.
 | Styling                           | Tailwind CSS v4 over design tokens                                             | 4.3.3                  |
 | Faces                             | Fraunces Variable (display), Inter Variable (UI), self-hosted                  | 5.3.0                  |
 | Validation                        | Zod                                                                            | 4.5.4                  |
-| Database                          | Postgres. Schema in `supabase/migrations`, 37 tables, RLS on all of them       | —                      |
+| Database                          | Postgres. Schema in `supabase/migrations`, 43 tables, RLS on all of them       | —                      |
 | Driver                            | `pg`, pooled, request-scoped JWT claim per transaction                         | 8.17.0                 |
 | Auth                              | Supabase Auth, **authentication only**                                         | `@supabase/ssr` 0.12.7 |
 | Test database                     | PGlite — Postgres 18 in-process, no server, no credentials                     | 0.5.8                  |
@@ -41,7 +41,8 @@ at the end of every stage.
 ### Layers
 
 ```
-app  →  components  →  domain      (types, local days, recurrence, units, idempotency)
+app  →  components  →  domain      (types, local days, recurrence, units, idempotency,
+   ↘                                   onboarding schemas, safety rules, plan generator)
    ↘  design                        (tokens + contrast maths)
    ↘  auth          → integrations/supabase   (sessions only)
    ↘  persistence   → repository interface
@@ -86,79 +87,100 @@ suite — and the SQL one passes it _through_ row-level security, as the `authen
 | **D27** | **`DATABASE_URL` that looks like a service-role connection is rejected at boot** | The service role bypasses every policy. Catching it in environment validation is cheaper than discovering it in an incident                                                                                                                                                                                                                           | No          |
 | **D28** | **Measurements stored metric, converted at the edge**                            | `unit_system` says what to show, never what to store, so switching systems cannot corrupt history                                                                                                                                                                                                                                                     | No          |
 | **D29** | **A small closed recurrence grammar, not RRULE**                                 | Daily, weekly-by-weekday and monthly-by-day cover everything the product needs, and a small grammar can be exhaustively tested and rendered back in plain English                                                                                                                                                                                     | Yes         |
+| **D30** | **A skipped step is a conservative answer, not a missing one**                   | Every step schema supplies its own defaults and the profile uses Zod's `.prefault({})`, so skipping produces a complete, usable, cautious week. The alternative — absent answers the generator checks for everywhere — puts the branch in every call site instead of once in the schema                                                               | No          |
+| **D31** | **"Prefer not to say" raises a safety notice; it never blocks**                  | Blocking someone for declining a personal question teaches them to lie to the form, and a form people lie to is more dangerous than one they leave blank                                                                                                                                                                                              | No          |
+| **D32** | **Safety rules may only tighten**                                                | Decisions are ranked and rules apply in sequence through `tighten()`, so the strictest answer wins and nothing later can relax it. Two conditions that each reroute something can never combine into permission                                                                                                                                       | No          |
+| **D33** | **The age gate is enforced in the database as well as the generator**            | A trigger rejects a `nutrition_targets` row with calories for a user under 18 without `guardian_confirmed_at`. A later feature that writes targets by another path cannot forget                                                                                                                                                                      | No          |
+| **D34** | **Nothing is written until the user accepts the week**                           | The generated week is a `plan_drafts` row. Reaching review and leaving creates no days, and the contract suite asserts it. A plan a person has edited is a plan they chose                                                                                                                                                                            | No          |
+| **D35** | **The edited draft is stored beside the generated one, not over it**             | The difference between what the engine proposed and what the user kept is the most useful signal this product will collect. Overwriting loses it                                                                                                                                                                                                      | Yes         |
+| **D36** | **Hard caps on week one: four training days, three habits, one quiet day**       | The limit protects the user from their own first-week enthusiasm, which is the single most reliable cause of abandonment in this category                                                                                                                                                                                                             | Yes         |
+| **D37** | **Durations live in `minutes`, never in an item's title**                        | The UI renders both, so a title that names its own duration reads "Mobility · 10 min 10 min". A test asserts no generated title contains one                                                                                                                                                                                                          | No          |
+| **D38** | **The review screen draws its draft in a plain server function, not an action**  | A server action may not revalidate a path during render. `ensureDraftWeek` is the reusable read; `generateDraftAction` wraps it for the client. Found by reading the dev-server log during an otherwise green E2E run                                                                                                                                 | No          |
 
 ## 3. Data model
 
-37 tables. The full account is in **`docs/DATA_MODEL.md`**; the schema itself is
-`supabase/migrations/0001` through `0010`.
+43 tables. The full account is in **`docs/DATA_MODEL.md`**; the schema itself is
+`supabase/migrations/0001` through `0011`. Stage 5 added `onboarding_progress`,
+`health_profile`, `training_profile`, `nutrition_profile`, `mind_profile` and `plan_drafts`,
+with row-level security on all of them and `user_owned_tables()` rewritten to cover them —
+so export and deletion reach them too.
 
 Five conventions run through all of it: ownership by `user_id` with RLS; local days with the
 zone stored beside the date; template / instance / log as separate tables; one unit system in
 storage; and `client_token` on every write a retry might repeat.
 
-**Migrations:** 10, applying from zero, proven in `src/persistence/rls.test.ts`.
+**Migrations:** 11, applying from zero, proven in `src/persistence/rls.test.ts`.
 **Not yet:** a migration-ledger table. `db:migrate` replays every file, which is fine while
 they are idempotent and the project is pre-release, and must change before the first deploy.
 
 ## 4. Routes
 
-| Route                        | Kind          | State                                                              |
-| ---------------------------- | ------------- | ------------------------------------------------------------------ |
-| `/`                          | redirect      | → `/today`                                                         |
-| `/today`                     | **dynamic**   | Live — reads the signed-in user's local day through the repository |
-| `/plan` `/train` `/progress` | static        | Placeholder                                                        |
-| `/mind`                      | static        | Placeholder, plus a working breathing pacer                        |
-| `/settings`                  | static        | Build info and planned sections                                    |
-| `/styleguide`                | dev only      | 404s in production                                                 |
-| `/api/health`                | route handler | Build, version and mode. No secrets                                |
+| Route                        | Kind          | State                                                                                                                                   |
+| ---------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`                          | redirect      | → `/today`                                                                                                                              |
+| `/today`                     | **dynamic**   | Live — reads the signed-in user's real local day through the repository, and offers to set up the first week until onboarding completes |
+| `/onboarding`                | **dynamic**   | Live — resumes at the step the user left                                                                                                |
+| `/onboarding/[step]`         | **dynamic**   | Live — eight questions and the week review                                                                                              |
+| `/plan` `/train` `/progress` | static        | Placeholder                                                                                                                             |
+| `/mind`                      | static        | Placeholder, plus a working breathing pacer                                                                                             |
+| `/settings`                  | static        | Build info and planned sections                                                                                                         |
+| `/styleguide`                | dev only      | 404s in production                                                                                                                      |
+| `/api/health`                | route handler | Build, version and mode. No secrets                                                                                                     |
 
 ## 5. Commands
 
 | Gate                         | Command                               | In CI           |
 | ---------------------------- | ------------------------------------- | --------------- |
 | Format · Lint · Types        | `format:check` · `lint` · `typecheck` | Yes             |
-| Unit, component and database | `npm test` — **242 tests**            | Yes             |
+| Unit, component and database | `npm test` — **374 tests**            | Yes             |
 | Build                        | `npm run build`                       | Yes             |
-| End-to-end                   | `npm run e2e` — **36 tests**          | Yes             |
+| End-to-end                   | `npm run e2e` — **50 tests**          | Yes             |
 | Everything                   | `npm run verify`                      | —               |
 | Migrate / seed / reset       | `db:migrate` · `db:seed` · `db:reset` | No — deployment |
 
 ## 6. Known limitations
 
 1. **No Supabase project exists.** Everything is proven against an in-process Postgres; the
-   migrations have never been applied to a hosted database. This is the one thing stage 4
-   cannot finish without the product owner — see §8.
-2. **Repositories exist for days and focus sessions only.** The other tables have schema,
-   policies, seed and tests; their repositories arrive with the modules that use them.
+   migrations have never been applied to a hosted database. This is the one thing still
+   blocked on the product owner — see §8. It did not block stage 5.
+2. **Repositories exist for days, focus sessions and onboarding only.** The other tables have
+   schema, policies, seed and tests; their repositories arrive with the modules that use them.
 3. **Four of six destinations are placeholders.**
-4. **No sign-in screen.** The auth provider works; the screen is stage 5's onboarding.
-5. **Offline shell only** — no service worker, no write queue, no sync.
-6. **No migration ledger table** (see §3).
-7. **No theme toggle.** The app follows `prefers-color-scheme`; a manual override is stage 5.
-8. TypeScript and ESLint are each one major version behind their latest release (D3, D4).
-9. **Playwright cannot run on this machine**: no browser, and the network allowlist blocks
-   `cdn.playwright.dev`. The suite runs in CI and was run for this stage elsewhere.
+4. **No sign-in screen.** The auth provider works and onboarding runs; the screen itself still
+   waits on the Supabase project (§8), because there is nothing to sign in to without one.
+5. **The plan engine generates week one only.** Adaptation needs completion history to adapt
+   to, which arrives with the modules that record it.
+6. **No programme selection.** Choosing the reset pack or a flexibility programme, with its
+   parameters editable and the 60-versus-66-day note shown, is still ahead. The mind step
+   offers the packs; starting one does not exist yet.
+7. **Offline shell only** — no service worker, no write queue, no sync.
+8. **No migration ledger table** (see §3).
+9. **No theme toggle.** The app follows `prefers-color-scheme`; a manual override is still open.
+10. TypeScript and ESLint are each one major version behind their latest release (D3, D4).
+11. **Playwright cannot run on the build machine**: no browser, and the network allowlist
+    blocks `cdn.playwright.dev`. The suite runs in CI with Playwright's own Chromium, and is
+    run here against a production build by setting `PLAYWRIGHT_CHROMIUM_PATH` to a
+    preinstalled one. There is no uncommitted local patch.
 
 ## 7. Open risks
 
-| Risk                                                       | Severity | Owner                          | Note                                                                                                                                                                                                                  |
-| ---------------------------------------------------------- | -------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Rights to ship the `Total Flexibility` programme structure | **High** | Product owner                  | Third-party commercial ebook. Now enforced in data: `flexibility_programs.rights_status = 'pending'`, and the seed ships it that way. Either obtain written permission from David Thurin or re-derive the progression |
-| Contrast-therapy safety                                    | **High** | Product + a qualified reviewer | 70–82 °C sauna, 13 °C immersion, no screening in the source. The pack is flagged `requires_safety_acknowledgement`, and `safety_acknowledgements` gates it                                                            |
-| Seed-oil content is contested and copyrighted              | Medium   | Product owner                  | Seeded as `third-party-no-redistribution`. At most one optional labelled note                                                                                                                                         |
-| Exercise animations do not exist                           | Medium   | Design                         | `exercise_animation_assets.is_original` must be true for anything shipped                                                                                                                                             |
-| No infrastructure                                          | Medium   | Engineering                    | §8                                                                                                                                                                                                                    |
-| Screen-reader testing has not been done                    | Medium   | Engineering                    | Stage 13                                                                                                                                                                                                              |
-| No backup or restore procedure                             | Medium   | Engineering                    | Needed before any real user data exists                                                                                                                                                                               |
-| Unattributed quotes in a source PDF                        | Low      | Content                        | The schema now refuses to attribute anything unverified                                                                                                                                                               |
+| Risk                                                       | Severity | Owner                          | Note                                                                                                                                                                                                                                                                       |
+| ---------------------------------------------------------- | -------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rights to ship the `Total Flexibility` programme structure | **High** | Product owner                  | Third-party commercial ebook. Now enforced in data: `flexibility_programs.rights_status = 'pending'`, and the seed ships it that way. Either obtain written permission from David Thurin or re-derive the progression                                                      |
+| Contrast-therapy safety                                    | **High** | Product + a qualified reviewer | 70–82 °C sauna, 13 °C immersion, no screening in the source. The pack is flagged `requires_safety_acknowledgement`, and `safety_acknowledgements` gates it                                                                                                                 |
+| Seed-oil content is contested and copyrighted              | Medium   | Product owner                  | Seeded as `third-party-no-redistribution`. At most one optional labelled note                                                                                                                                                                                              |
+| Exercise animations do not exist                           | Medium   | Design                         | `exercise_animation_assets.is_original` must be true for anything shipped                                                                                                                                                                                                  |
+| No infrastructure                                          | Medium   | Engineering                    | §8                                                                                                                                                                                                                                                                         |
+| **The safety rules have not been reviewed by a clinician** | **High** | Product + a qualified reviewer | The rules in `src/domain/safety.ts` are conservative and tested, but they were written by an engineer reading source PDFs. Pregnancy, cardiovascular and injury gating is exactly the kind of judgement that needs a professional to sign it off before real users meet it |
+| Screen-reader testing has not been done                    | Medium   | Engineering                    | Stage 13                                                                                                                                                                                                                                                                   |
+| No backup or restore procedure                             | Medium   | Engineering                    | Needed before any real user data exists                                                                                                                                                                                                                                    |
+| Unattributed quotes in a source PDF                        | Low      | Content                        | The schema now refuses to attribute anything unverified                                                                                                                                                                                                                    |
 
 ## 8. Exact next step
 
-**Blocked on one thing, then stage 5.**
+**Still blocked on one thing, and it is not blocking the build.**
 
 ### Blocked: the Supabase project (product owner, ~20 minutes)
-
-Everything else in stage 4 is done and tested. What is needed:
 
 1. Create a Supabase project. Note the region — put it near the users, not near the developer.
 2. From **Project settings → API**, copy the project URL and the `anon` key into
@@ -169,26 +191,33 @@ Everything else in stage 4 is done and tested. What is needed:
      that row-level security applies to. Environment validation rejects a service-role URL here.
    - the **service-role** URL, as `SUPABASE_DB_URL`, kept out of the repository. Migrations
      and the seed only.
-4. `npm run db:reset` — applies all ten migrations, then seeds content and the demo account.
+4. `npm run db:reset` — applies all eleven migrations, then seeds content and the demo account.
 5. In **Authentication → Providers**, enable email, and one social provider.
 6. Set `NEXT_PUBLIC_APP_MODE=live` and start the app.
 
-Until then `NEXT_PUBLIC_APP_MODE=demo` runs the whole product with no credentials at all.
+Until then `NEXT_PUBLIC_APP_MODE=demo` runs the whole product, onboarding included, with no
+credentials at all.
 
-### Then: stage 5 — onboarding and the adaptive plan engine
+### Also waiting on the product owner
 
-1. The sign-in screen the auth provider is waiting for, and the session middleware that
-   refreshes it.
-2. Onboarding: name, timezone, what they want help with, and **the minimum viable day** —
-   writing to `profiles`, `preferences` and `onboarding_answers`.
-3. Programme selection, with every parameter editable before starting and the 60-versus-66-day
-   note shown.
-4. The plan engine: expand habit schedules and task recurrences into a day, honouring the
-   user's week start and timezone. The recurrence module is already built and tested.
-5. Repositories for `habits`, `habit_schedules` and `tasks`, held to the same contract.
+The safety rules need a clinical reviewer before real users meet them (§7). The rules are
+written, conservative and tested; what is missing is a professional saying so. This is not
+blocking stage 6, but it blocks launch.
 
-**Do not build feature modules (stage 6 onward) before onboarding exists.** Every module needs
-a user who has said what a real day looks like for them.
+### Then: stage 6 — the daily system
+
+Onboarding now produces a real week, so the modules finally have a user who has said what a
+real day looks like for them.
+
+1. Checking items off, committing to the day, and the evening review — the `/today` screen
+   currently reads but does not write.
+2. Repositories for `habits`, `habit_schedules` and `tasks`, held to the same contract suite,
+   so the draft's habits become recurring schedules rather than one week of items.
+3. Attaching a focus session to a task and keeping its history. The timer and the idempotent
+   write already exist; nothing is recorded yet.
+4. The sign-in screen, once the Supabase project exists.
+5. Week two: the first adaptation, which is the first time completion history has anywhere to
+   go.
 
 ## 9. Working rules learned the hard way
 
@@ -201,3 +230,8 @@ a user who has said what a real day looks like for them.
   asserts will eventually lie.
 - When a rule can be a constraint, make it a constraint (D26). Code forgets; constraints do not.
 - A security claim with no adversarial test behind it is a wish (D22).
+- **Read the dev-server log even when the suite is green.** The `revalidatePath`-during-render
+  bug (D38) passed all fifty end-to-end tests and only appeared in Next's output.
+- **Look at the screenshots, do not just take them.** Three defects in this stage — duplicated
+  copy on two steps, a duplicated duration on every timed item, and a translucent save bar over
+  dense content — were invisible to every test and obvious in a picture.

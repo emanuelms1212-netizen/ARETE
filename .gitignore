@@ -32,3 +32,6 @@ dist/
 .vercel
 .idea/
 .vscode/
+
+# Scratch file used to move the source into the test sandbox. Always empty at rest.
+.transfer.tar.gz
