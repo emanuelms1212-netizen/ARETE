@@ -518,7 +518,87 @@ travel; and the three Today metrics wrapped 2-then-1, so they became a three-col
 - [ ] **Week two** — adaptation now has history to read, but nothing reads it.
 - [ ] Projects, and linking tasks to goals through the UI.
 
-## Stages 7–17 — not started
+## Stage 7 — Meditation, breathwork and cognitive practice
 
-Tracked in `docs/PROJECT_LEDGER.md` §8. No item below stage 7 may be ticked before the
+### One session player, three modes
+
+- [x] Preparation, instruction, timer and progress, pause and exit, completion rating, notes
+- [x] Shared state machine, so the three modes cannot drift apart on what "paused" means
+- [x] Elapsed time derived from timestamps — a session survives backgrounding and a reload
+- [x] A reload lands back **inside** whatever was running, on the right mode (D64)
+- [x] Paused time is not counted as practice — asserted in the contract suite
+- [x] Stopping early is a first-class exit, labelled "Stop here" and recorded as abandoned
+- [x] The wording for it never matches `/failed|incomplete|gave up|only|just/`
+- [x] Ratings describe how it went — "Hard going", "Restless", "Settled" — not how well
+
+### Meditation, and the opt-in pack
+
+- [x] Five secular practices: breath awareness, body scan, open monitoring, loving-kindness,
+      silent timer
+- [x] Length adjustable from 5 to 25 minutes, per practice
+- [x] The Jewish pack exists, is offered neutrally, and is **off**
+- [x] Its practices are **absent** until chosen — not greyed out, not listed as locked
+- [x] Starting one by naming its slug directly is refused, not merely hidden (D55)
+- [x] Turning the pack off makes them absent again
+- [x] The rule is enforced in the repository query, so no screen has to remember it
+- [x] Both adapters are held to it, the SQL one through row-level security
+- [x] **No liturgical text is reproduced** — week three points to the user's own siddur, and
+      Psalm 16:8 is cited by reference (D56)
+- [x] Provenance is carried on every packed practice and shown in the UI
+
+### Breathwork
+
+- [x] Five patterns: calm, box, extended exhale, coherent, pre-focus
+- [x] **No hyperventilation protocols** — `isConservative` guards the set, and a test asserts
+      every shipped pattern passes it (D57)
+- [x] No hold longer than eight seconds; no pattern faster than twelve breaths a minute
+- [x] The orb's phase is derived from elapsed seconds, so a locked phone resumes correctly
+- [x] Zero-length phases are skipped rather than flashed
+- [x] Rounds configurable; stopping early is a choice, and the planned count is kept beside it
+- [x] Safety copy on the screen where the decision is made, not behind a link — asserted
+- [x] It names the symptoms that mean stop, and the places never to practise
+- [x] It makes no claim about what breathing will do for you
+
+### Cognitive practice
+
+- [x] **No score, no percentile, no IQ** — the schema has no column and the domain no field
+- [x] A test asserts the module's whole surface never matches `/\biq\b|percentile|\bscore\b/`
+- [x] Every drill describes what it measures as being "at this task"
+- [x] The transfer limit is stated **before** a drill is offered, not after a result
+- [x] The practice summary is phrased about the drill, never about the person
+- [x] A decline is reported without dramatising it
+- [x] Three sessions are needed before any pattern is claimed
+- [x] Drills rotate to the least-practised one
+- [x] Items are deterministic from the session id, so a reload does not reshuffle them (D62)
+- [x] The median response time is taken over correct answers only
+- [x] Two drills run end to end: mental arithmetic and working memory
+
+### Accessibility and motion
+
+- [x] Reduced motion keeps the pacing — phase name, count, ring fill and live region (D59)
+- [x] The breathing phase is announced through `aria-live="polite"`, not by sound alone
+- [x] The orb never collapses to nothing on the out-breath
+- [x] Asserted end to end with `reducedMotion: 'reduce'`
+
+### Verification
+
+- [x] `npm test` — **655** unit, component and database tests
+- [x] `npm run e2e` — **100** end-to-end tests, run twice with no flakes
+- [x] Format, lint, typecheck and build all clean
+- [x] A full drill played through end to end in a real browser: 9 of 12, the transfer note
+      present, the session landing in history
+- [x] Screenshots captured and inspected at 390×844 and 1440×900
+
+### Not done, and why
+
+- [ ] **Four of six drills** — sustained attention, reaction time, recall and spaced
+      retrieval have definitions and a schema but no runner, so they are not offered (D61).
+- [ ] **Sound and haptics toggles** for breathwork — the visual and announced pacing work;
+      audio has not been built.
+- [ ] **Migrations applied to a hosted database** — still no Supabase project.
+- [ ] The journal, which the Mind screen will eventually hold alongside these.
+
+## Stages 8–17 — not started
+
+Tracked in `docs/PROJECT_LEDGER.md` §8. No item below stage 8 may be ticked before the
 stage that builds it has run and been verified.

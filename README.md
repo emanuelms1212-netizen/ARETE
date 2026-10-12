@@ -26,6 +26,11 @@ prompt, the day's commitments with complete, skip-with-reason, move-to-tomorrow,
 quick-add, a minimum-day switch, a focus timer whose state lives on the server, and the
 evening review. Plan holds goals, tasks across four views, and habits of four kinds.
 
+Mind is live too: five secular meditations, five slow breathing patterns with the safety copy
+on the screen where the decision is made, and two cognitive drills that report practice at
+that drill and explicitly nothing else. An optional meditation pack exists and is off — its
+practices are absent until someone chooses it.
+
 Train and Progress still render an honest "not built yet" state naming the stage that builds
 them.
 

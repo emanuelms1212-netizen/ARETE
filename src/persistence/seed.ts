@@ -1,3 +1,4 @@
+import { ALL_PRACTICES } from '@/content/mind/practices';
 import type { SqlExecutor } from './sql-executor';
 import { DEMO_USER_ID, demoDays } from './demo-data';
 
@@ -159,6 +160,49 @@ export const CONTENT_PACKS: readonly SeededPack[] = [
 ];
 
 /** Applies the content seed. Safe to run repeatedly. */
+/**
+ * The mind practice catalogue.
+ *
+ * Content, so it is seeded rather than migrated — which means it can be
+ * corrected without a schema change. The pack link is what the request-path
+ * query filters on, so a practice seeded with a `contentPackSlug` is invisible
+ * until the user chooses that pack.
+ */
+async function seedMindPractices(executor: SqlExecutor): Promise<void> {
+  let position = 0;
+  for (const practice of ALL_PRACTICES) {
+    position += 1;
+    await executor.query(
+      `insert into public.mind_practices
+         (slug, kind, title, summary, steps, default_minutes, min_minutes, max_minutes,
+          pattern, drill, content_pack_slug, provenance_note, position)
+       values ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9::jsonb, $10, $11, $12, $13)
+       on conflict (slug) do update set
+         kind = excluded.kind, title = excluded.title, summary = excluded.summary,
+         steps = excluded.steps, default_minutes = excluded.default_minutes,
+         min_minutes = excluded.min_minutes, max_minutes = excluded.max_minutes,
+         pattern = excluded.pattern, drill = excluded.drill,
+         content_pack_slug = excluded.content_pack_slug,
+         provenance_note = excluded.provenance_note, position = excluded.position`,
+      [
+        practice.slug,
+        practice.kind,
+        practice.title,
+        practice.summary,
+        JSON.stringify(practice.steps),
+        practice.defaultMinutes,
+        practice.minMinutes,
+        practice.maxMinutes,
+        practice.pattern === null ? null : JSON.stringify(practice.pattern),
+        practice.drill,
+        practice.contentPackSlug,
+        practice.provenanceNote,
+        position,
+      ],
+    );
+  }
+}
+
 export async function seedContent(executor: SqlExecutor): Promise<void> {
   for (const source of CONTENT_SOURCES) {
     await executor.query(
@@ -220,6 +264,8 @@ export async function seedContent(executor: SqlExecutor): Promise<void> {
      select null, 'A missed day is a fact, not a verdict.', 'original-paraphrase'
       where not exists (select 1 from public.quotes where text = 'A missed day is a fact, not a verdict.')`,
   );
+
+  await seedMindPractices(executor);
 }
 
 /**

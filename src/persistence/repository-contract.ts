@@ -1230,6 +1230,241 @@ export function describeRepositoryContract(
       });
     });
 
+    // =====================================================================
+    // Mind: meditation, breathwork and cognitive practice
+    // =====================================================================
+    describe('mind', () => {
+      const MIND_START = new Date('2026-03-16T07:00:00Z');
+
+      async function startMeditation(subject: ContractSubject, token = 'mind-1') {
+        return subject.repository.startMindSession(subject.userId, {
+          kind: 'meditation',
+          practiceSlug: 'breath-awareness',
+          localDate: DAY,
+          timeZone: ZONE,
+          startedAt: MIND_START,
+          plannedMinutes: 10,
+          clientToken: token,
+        });
+      }
+
+      it('offers the secular practices to everyone', async () => {
+        const { repository, userId } = await fresh();
+        const practices = await repository.listMindPractices(userId, 'meditation');
+
+        expect(practices.map((p) => p.slug)).toContain('breath-awareness');
+        expect(practices.map((p) => p.slug)).toContain('loving-kindness');
+      });
+
+      it('hides an opt-in pack until it is chosen — the rule from SOURCE_MAP §5', async () => {
+        const { repository, userId } = await fresh();
+        const before = await repository.listMindPractices(userId, 'meditation');
+
+        // Not greyed out, not listed as locked. Absent.
+        expect(before.some((p) => p.contentPackSlug === 'jewish-meditation')).toBe(false);
+      });
+
+      it('shows the pack’s practices once the user chooses it', async () => {
+        const { repository, userId } = await fresh();
+        await repository.setPackChosen(userId, 'jewish-meditation', true);
+
+        const after = await repository.listMindPractices(userId, 'meditation');
+        expect(after.some((p) => p.contentPackSlug === 'jewish-meditation')).toBe(true);
+      });
+
+      it('hides them again when the pack is turned off', async () => {
+        const { repository, userId } = await fresh();
+        await repository.setPackChosen(userId, 'jewish-meditation', true);
+        await repository.setPackChosen(userId, 'jewish-meditation', false);
+
+        const after = await repository.listMindPractices(userId, 'meditation');
+        expect(after.some((p) => p.contentPackSlug === 'jewish-meditation')).toBe(false);
+      });
+
+      it('refuses to start a practice from a pack that was never chosen', async () => {
+        // The rule has to hold against a request that names the slug directly,
+        // not only against a screen that declines to show it.
+        const { repository, userId } = await fresh();
+
+        await expect(
+          repository.startMindSession(userId, {
+            kind: 'meditation',
+            practiceSlug: 'jm-week-3-shema',
+            localDate: DAY,
+            timeZone: ZONE,
+            startedAt: MIND_START,
+            plannedMinutes: 10,
+            clientToken: 'sneaky',
+          }),
+        ).rejects.toThrow();
+      });
+
+      it('reports every pack as unchosen on a fresh account', async () => {
+        const { repository, userId } = await fresh();
+        const packs = await repository.listMindPacks(userId);
+
+        expect(packs.length).toBeGreaterThan(0);
+        expect(packs.every((pack) => !pack.chosen)).toBe(true);
+      });
+
+      it('marks the sensitive pack as one that must be chosen explicitly', async () => {
+        const { repository, userId } = await fresh();
+        const packs = await repository.listMindPacks(userId);
+        const jewish = packs.find((pack) => pack.slug === 'jewish-meditation');
+
+        expect(jewish?.requiresExplicitChoice).toBe(true);
+      });
+
+      it('restores a running session after a reload', async () => {
+        const subject = await fresh();
+        await startMeditation(subject);
+
+        const restored = await subject.repository.getRunningMindSession(
+          subject.userId,
+          'meditation',
+        );
+
+        expect(restored?.practiceSlug).toBe('breath-awareness');
+        expect(restored?.startedAt.toISOString()).toBe(MIND_START.toISOString());
+      });
+
+      it('refuses a second session of the same kind', async () => {
+        const subject = await fresh();
+        await startMeditation(subject);
+
+        await expect(startMeditation(subject, 'mind-2')).rejects.toThrow();
+      });
+
+      it('returns the same session for a retried start', async () => {
+        const subject = await fresh();
+        const first = await startMeditation(subject, 'same');
+
+        expect((await startMeditation(subject, 'same')).id).toBe(first.id);
+      });
+
+      it('allows a different kind to run at the same time', async () => {
+        // Breathing before a focus block while a silent timer runs is sensible,
+        // not a conflict.
+        const subject = await fresh();
+        await startMeditation(subject);
+
+        await expect(
+          subject.repository.startMindSession(subject.userId, {
+            kind: 'breathwork',
+            practiceSlug: 'box-breathing',
+            localDate: DAY,
+            timeZone: ZONE,
+            startedAt: MIND_START,
+            plannedRounds: 8,
+            clientToken: 'breath-1',
+          }),
+        ).resolves.toBeDefined();
+      });
+
+      it('does not count paused time as practice', async () => {
+        const subject = await fresh();
+        await startMeditation(subject);
+
+        await subject.repository.pauseMindSession(
+          subject.userId,
+          'meditation',
+          new Date(MIND_START.getTime() + 120_000),
+        );
+        await subject.repository.resumeMindSession(
+          subject.userId,
+          'meditation',
+          new Date(MIND_START.getTime() + 3_720_000),
+        );
+        const finished = await subject.repository.finishMindSession(subject.userId, {
+          kind: 'meditation',
+          at: new Date(MIND_START.getTime() + 3_780_000),
+          status: 'completed',
+        });
+
+        // Two minutes before the pause, one after. Not sixty-three.
+        expect(finished?.accumulatedSeconds).toBe(180);
+      });
+
+      it('keeps a rating and a reflection with the finished session', async () => {
+        const subject = await fresh();
+        await startMeditation(subject);
+
+        const finished = await subject.repository.finishMindSession(subject.userId, {
+          kind: 'meditation',
+          at: new Date(MIND_START.getTime() + 600_000),
+          status: 'completed',
+          rating: 4,
+          reflection: 'Quieter than last time.',
+        });
+
+        expect(finished?.rating).toBe(4);
+        expect(finished?.reflection).toBe('Quieter than last time.');
+      });
+
+      it('records stopping early as abandoned rather than as nothing', async () => {
+        const subject = await fresh();
+        await startMeditation(subject);
+        await subject.repository.finishMindSession(subject.userId, {
+          kind: 'meditation',
+          at: new Date(MIND_START.getTime() + 180_000),
+          status: 'abandoned',
+        });
+
+        const history = await subject.repository.listMindHistory(subject.userId, {
+          kind: 'meditation',
+        });
+        expect(history[0]?.status).toBe('abandoned');
+      });
+
+      it('keeps per-item detail for a drill without producing a score', async () => {
+        const subject = await fresh();
+        await subject.repository.startMindSession(subject.userId, {
+          kind: 'cognitive',
+          practiceSlug: 'mental-arithmetic',
+          localDate: DAY,
+          timeZone: ZONE,
+          startedAt: MIND_START,
+          clientToken: 'drill-1',
+        });
+
+        await subject.repository.finishMindSession(subject.userId, {
+          kind: 'cognitive',
+          at: new Date(MIND_START.getTime() + 300_000),
+          status: 'completed',
+          items: [
+            { prompt: '2 + 2', answer: '4', given: '4', correct: true, responseMs: 900 },
+            { prompt: '7 × 3', answer: '21', given: '18', correct: false, responseMs: 2000 },
+            { prompt: '9 − 4', answer: '5', given: '5', correct: true, responseMs: 700 },
+          ],
+        });
+
+        const history = await subject.repository.listMindHistory(subject.userId, {
+          kind: 'cognitive',
+        });
+        expect(history[0]?.itemsAttempted).toBe(3);
+        expect(history[0]?.itemsCorrect).toBe(2);
+        // The median is over correct answers only, so a fast wrong one cannot
+        // flatter it.
+        expect(history[0]?.medianResponseMs).toBe(800);
+      });
+
+      it('has an empty history before anything is practised', async () => {
+        const { repository, userId } = await fresh();
+        expect(await repository.listMindHistory(userId)).toEqual([]);
+      });
+
+      it('returns null when there is nothing to finish', async () => {
+        const { repository, userId } = await fresh();
+        expect(
+          await repository.finishMindSession(userId, {
+            kind: 'breathwork',
+            at: new Date(),
+            status: 'completed',
+          }),
+        ).toBeNull();
+      });
+    });
+
     it('deletes everything, and means it', async () => {
       const { repository, userId } = await fresh();
       await repository.upsertDay(userId, {

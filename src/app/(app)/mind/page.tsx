@@ -1,36 +1,79 @@
 import type { Metadata } from 'next';
-import { ModulePlaceholder } from '@/components/module-placeholder';
-import { BreathingRing, Section } from '@/components/ui';
+import { getCurrentUser } from '@/auth';
+import { MindBoard } from '@/components/mind/mind-board';
+import { EmptyState, PageHeader } from '@/components/ui';
+import type { MindKind } from '@/domain';
+import { withUser } from '@/persistence';
+import {
+  finishMindAction,
+  pauseMindAction,
+  resumeMindAction,
+  setPackChosenAction,
+  startMindAction,
+} from './actions';
 
 export const metadata: Metadata = { title: 'Mind' };
 
-export default function MindPage() {
+/** Per-user: which packs are chosen changes what this page may even list. */
+export const dynamic = 'force-dynamic';
+
+const KINDS: readonly MindKind[] = ['meditation', 'breathwork', 'cognitive'];
+
+export default async function MindPage() {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return (
+      <EmptyState
+        title="You are signed out."
+        body="Demo mode is the way in until the Supabase project exists."
+      />
+    );
+  }
+
+  const data = await withUser(user.id, async (repository) => {
+    const practices = {} as Record<
+      MindKind,
+      Awaited<ReturnType<typeof repository.listMindPractices>>
+    >;
+    const running = {} as Record<
+      MindKind,
+      Awaited<ReturnType<typeof repository.getRunningMindSession>>
+    >;
+
+    for (const kind of KINDS) {
+      // The repository does the pack filtering, so this page cannot
+      // accidentally list a practice the account has not opted into.
+      practices[kind] = await repository.listMindPractices(user.id, kind);
+      running[kind] = await repository.getRunningMindSession(user.id, kind);
+    }
+
+    return {
+      practices,
+      running,
+      packs: await repository.listMindPacks(user.id),
+      history: await repository.listMindHistory(user.id, { limit: 20 }),
+    };
+  });
+
   return (
-    <ModulePlaceholder
-      title="Mind"
-      question="Meditation, breathwork, practice and journal."
-      arrivesIn="stage 7 (meditation, breathwork and cognitive practice)"
-      contains={[
-        'Meditation packs, chosen by you and never assumed',
-        'Breathwork with conservative defaults',
-        'Cognitive drills that report practice only, never IQ',
-        'Stoic journal and evening reflection',
-      ]}
-      preview={
-        <Section
-          title="Breathing pacer"
-          hint="Working today. Nothing is recorded until the Mind module is built."
-        >
-          <div className="py-4">
-            <BreathingRing />
-          </div>
-          <p className="mt-2 text-body-sm text-ink-muted">
-            A long exhale is the part of paced breathing the evidence is comfortable with, and that
-            is all this claims to be. It is not a treatment for anxiety or anything else. With
-            reduced motion on, the ring rests still and the written cue keeps the pacing.
-          </p>
-        </Section>
-      }
-    />
+    <div className="space-y-4">
+      <PageHeader
+        title="Mind"
+        lede="Sit, breathe, or practise. Each one records what you actually did and nothing more."
+      />
+
+      <MindBoard
+        practices={data.practices}
+        packs={data.packs}
+        running={data.running}
+        history={data.history}
+        onStart={startMindAction}
+        onPause={pauseMindAction}
+        onResume={resumeMindAction}
+        onFinish={finishMindAction}
+        onSetPack={setPackChosenAction}
+      />
+    </div>
   );
 }

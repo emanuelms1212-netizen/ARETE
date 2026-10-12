@@ -2,7 +2,7 @@
 
 The schema, and the reasoning behind it.
 
-**Source of truth:** `supabase/migrations/` — twelve files, applied in order, 46 tables.
+**Source of truth:** `supabase/migrations/` — thirteen files, applied in order, 48 tables.
 **Proof:** `src/persistence/rls.test.ts` applies them from zero to a real Postgres and tries
 to break the isolation. `src/persistence/sql-repository.test.ts` holds the production SQL to
 the same contract as the demo adapter, through the policies.
@@ -80,6 +80,17 @@ Not "is a policy present" but "does it hold":
 - An unauthenticated session sees nothing at all.
 - Library content is readable but not writable.
 - No table in `public` is missing RLS, FORCE, or a policy.
+
+## 3a. The one rule the schema is the enforcement point for
+
+An optional content pack is visible only when a `user_content_packs` row says the user chose
+it. That row is created by a person pressing a switch — never inferred from a name, a
+language, a region or anything else (SOURCE_MAP §5, D55).
+
+The repository's `listMindPractices` carries that into one `where` clause, and
+`startMindSession` re-checks it, so a practice from an unchosen pack is absent rather than
+hidden and cannot be started by naming its slug. Both adapters are held to it by the shared
+contract suite, and the SQL one through row-level security.
 
 ## 4. Product rules the schema enforces
 

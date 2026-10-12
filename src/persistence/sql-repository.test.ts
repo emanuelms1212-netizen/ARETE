@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { afterAll, beforeAll } from 'vitest';
 import { describeRepositoryContract } from './repository-contract';
+import { seedContent } from './seed';
 import { createSqlRepository } from './sql-repository';
 import type { SqlExecutor } from './sql-executor';
 import { USER_A, createTestDatabase, type TestDatabase } from './testing/test-database';
@@ -17,7 +18,15 @@ let database: TestDatabase;
 
 beforeAll(async () => {
   database = await createTestDatabase();
-}, 60_000);
+
+  // The practice catalogue and the content packs are library content, seeded
+  // rather than migrated. Without them the Mind contract has nothing to offer,
+  // and the pack rule has nothing to hide.
+  await database.asOwner();
+  await seedContent({
+    query: (text, params) => database.db.query(text, params ? [...params] : undefined),
+  });
+}, 120_000);
 
 afterAll(async () => {
   await database?.close();

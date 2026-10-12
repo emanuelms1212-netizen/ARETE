@@ -11,12 +11,15 @@ import type {
   HabitStatus,
   IsoDate,
   Measurement,
+  MindKind,
+  MindSession,
   Milestone,
   OnboardingProfile,
   OnboardingProgress,
   OnboardingStep,
   Recurrence,
 } from '@/domain';
+import type { DrillItem } from '@/domain';
 
 /**
  * The persistence contract.
@@ -445,6 +448,103 @@ export interface StartFocusInput {
   readonly clientToken: string;
 }
 
+// ---------------------------------------------------------------------------
+// Mind: meditation, breathwork and cognitive practice
+// ---------------------------------------------------------------------------
+
+export interface MindPractice {
+  readonly slug: string;
+  readonly kind: MindKind;
+  readonly title: string;
+  readonly summary: string;
+  readonly defaultMinutes: number | null;
+  readonly minMinutes: number | null;
+  readonly maxMinutes: number | null;
+  readonly pattern: Record<string, number> | null;
+  readonly drill: string | null;
+  /** Null for the practices that ship with the app; a slug ties it to a pack. */
+  readonly contentPackSlug: string | null;
+  readonly provenanceNote: string | null;
+  readonly steps: readonly { label: string; seconds?: number; say?: string }[];
+}
+
+export interface MindPack {
+  readonly slug: string;
+  readonly title: string;
+  /**
+   * True for anything that must never be inferred from identity, language or
+   * location. The Jewish meditation pack above all — SOURCE_MAP §5.
+   */
+  readonly requiresExplicitChoice: boolean;
+  readonly provenanceNote: string | null;
+  readonly chosen: boolean;
+}
+
+export interface StartMindInput {
+  readonly kind: MindKind;
+  readonly practiceSlug: string;
+  readonly localDate: IsoDate;
+  readonly timeZone: string;
+  readonly startedAt: Date;
+  readonly plannedMinutes?: number | null;
+  /** Breathwork only. */
+  readonly plannedRounds?: number | null;
+  /** Identifies this start attempt, so a retry of it is not a second start. */
+  readonly clientToken: string;
+}
+
+export interface FinishMindInput {
+  readonly kind: MindKind;
+  readonly at: Date;
+  readonly status: 'completed' | 'abandoned';
+  readonly rating?: number | null;
+  readonly reflection?: string | null;
+  /** Breathwork only: rounds actually completed. */
+  readonly rounds?: number | null;
+  /** Cognitive only. */
+  readonly items?: readonly DrillItem[];
+}
+
+export interface MindHistoryEntry {
+  readonly id: string;
+  readonly kind: MindKind;
+  readonly practiceSlug: string;
+  readonly localDate: IsoDate;
+  readonly minutes: number;
+  readonly status: 'completed' | 'abandoned';
+  readonly rating: number | null;
+  readonly reflection: string | null;
+  /** Cognitive only, and never presented as a score. */
+  readonly drill: string | null;
+  readonly itemsAttempted: number | null;
+  readonly itemsCorrect: number | null;
+  readonly medianResponseMs: number | null;
+}
+
+export interface MindRepository {
+  /**
+   * The practices this user may be offered.
+   *
+   * A practice belonging to a pack is excluded unless the user has chosen that
+   * pack. This is the enforcement point for the rule in SOURCE_MAP §5: it is
+   * one query, not a thing each screen has to remember.
+   */
+  listMindPractices(userId: string, kind?: MindKind): Promise<readonly MindPractice[]>;
+  listMindPacks(userId: string): Promise<readonly MindPack[]>;
+  setPackChosen(userId: string, packSlug: string, chosen: boolean): Promise<readonly MindPack[]>;
+
+  startMindSession(userId: string, input: StartMindInput): Promise<MindSession>;
+  getRunningMindSession(userId: string, kind: MindKind): Promise<MindSession | null>;
+  pauseMindSession(userId: string, kind: MindKind, at: Date): Promise<MindSession>;
+  resumeMindSession(userId: string, kind: MindKind, at: Date): Promise<MindSession>;
+  finishMindSession(userId: string, input: FinishMindInput): Promise<MindSession | null>;
+
+  listMindHistory(
+    userId: string,
+    options?: { readonly kind?: MindKind; readonly limit?: number },
+  ): Promise<readonly MindHistoryEntry[]>;
+}
+
 export interface AccountRepository {
   /** Everything the account holds, as one document. Immediate, no queue. */
   exportEverything(userId: string): Promise<AccountExport>;
@@ -460,6 +560,7 @@ export interface AreteRepository
     GoalRepository,
     TaskRepository,
     HabitRepository,
+    MindRepository,
     FocusSessionRepository,
     AccountRepository {
   readonly kind: 'memory' | 'sql';

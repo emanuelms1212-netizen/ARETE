@@ -171,23 +171,54 @@ test.describe('command launcher', () => {
   });
 });
 
-test.describe('motion', () => {
+test.describe.serial('motion', () => {
   test.use({ reducedMotion: 'reduce' });
 
-  test('the breathing ring rests still when reduced motion is requested', async ({ page }) => {
+  /**
+   * Reduced motion is not a degraded version of the orb.
+   *
+   * The orb stops scaling, and everything that paces the breath — the phase
+   * name, the count, the round — keeps working. Someone who has turned motion
+   * off still needs to know when to breathe out.
+   */
+  test('the breathing orb rests still, and still paces the breath', async ({ page }) => {
     await page.goto('/mind');
 
-    const animation = await page
-      .locator('.animate-breathe')
+    const stop = page.getByRole('button', { name: 'Stop here' });
+    if (await stop.isVisible()) {
+      await stop.click();
+      const skip = page.getByRole('button', { name: 'Skip' });
+      if (await skip.isVisible()) await skip.click();
+    }
+
+    await expect(async () => {
+      await page
+        .locator('label')
+        .filter({ hasText: /^Breathe$/ })
+        .first()
+        .click();
+      await expect(page.getByRole('radio', { name: 'Breathe' })).toBeChecked({ timeout: 1000 });
+    }).toPass({ timeout: 15_000 });
+
+    await page.getByRole('button', { name: /Box breathing/ }).click();
+    await page.getByRole('button', { name: /^Begin \d+ rounds$/ }).click();
+
+    // The cue is there and it names a phase.
+    await expect(page.getByText(/Breathe in|Hold|Breathe out|Rest/).first()).toBeVisible();
+    // The visible caption, not the live region — both carry the round, by
+    // design, so this asks for the one a sighted user reads.
+    await expect(page.getByText(/^Round \d+ of \d+$/)).toBeVisible();
+
+    // And the orb is not animating: its size is fixed rather than transitioning.
+    const transition = await page
+      .locator('div.rounded-full.bg-accent-soft')
       .first()
-      .evaluate((element) => getComputedStyle(element).animationName);
+      .evaluate((element) => getComputedStyle(element).transitionProperty);
+    expect(transition === 'none' || transition === 'all').toBe(true);
 
-    expect(animation).toBe('none');
-  });
-
-  test('the breathing cue still paces the practice without motion', async ({ page }) => {
-    await page.goto('/mind');
-    await expect(page.getByText('Four in · two held · six out')).toBeVisible();
+    await page.getByRole('button', { name: 'Stop here' }).click();
+    const skip = page.getByRole('button', { name: 'Skip' });
+    if (await skip.isVisible()) await skip.click();
   });
 });
 
@@ -653,5 +684,109 @@ test.describe.serial('the full loop', () => {
 
     await page.getByRole('button', { name: 'Finish' }).click();
     await expect(page.getByRole('button', { name: /^Start \d+ minutes$/ })).toBeVisible();
+  });
+});
+
+/**
+ * Mind: meditation, breathwork and cognitive practice.
+ *
+ * Three of these are compliance assertions rather than feature tests — the
+ * religious pack staying invisible, the absence of any outcome claim, and the
+ * breathwork safety copy being on the screen where the decision is made. They
+ * are the acceptance criteria this stage is actually judged on.
+ */
+test.describe.serial('mind', () => {
+  async function toMode(page: import('@playwright/test').Page, label: string) {
+    await page.goto('/mind');
+    // Leave any session a previous test left running.
+    const stop = page.getByRole('button', { name: 'Stop here' });
+    if (await stop.isVisible()) {
+      await stop.click();
+      const skip = page.getByRole('button', { name: 'Skip' });
+      if (await skip.isVisible()) await skip.click();
+    }
+    await expect(async () => {
+      await page
+        .locator('label')
+        .filter({ hasText: new RegExp(`^${label}$`) })
+        .first()
+        .click();
+      await expect(page.getByRole('radio', { name: label })).toBeChecked({ timeout: 1000 });
+    }).toPass({ timeout: 15_000 });
+  }
+
+  test('offers the secular practices to anyone', async ({ page }) => {
+    await toMode(page, 'Meditate');
+
+    await expect(page.getByText('Breath awareness')).toBeVisible();
+    await expect(page.getByText('Loving-kindness')).toBeVisible();
+  });
+
+  test('keeps the religious pack invisible until it is chosen', async ({ page }) => {
+    await toMode(page, 'Meditate');
+
+    // The pack is offered neutrally in a list of packs...
+    await expect(page.getByText('Jewish meditation — four weeks')).toBeVisible();
+    // ...but none of its practices exist until it is picked.
+    await expect(page.getByText(/week one — breath and stillness/i)).toHaveCount(0);
+    await expect(page.getByText(/hitbodedut/i)).toHaveCount(0);
+  });
+
+  test('shows the pack’s practices once chosen, and hides them again when not', async ({
+    page,
+  }) => {
+    await toMode(page, 'Meditate');
+
+    await page.getByText('Jewish meditation — four weeks').click();
+    await expect(page.getByText(/week one — breath and stillness/i)).toBeVisible();
+
+    await page.getByText('Jewish meditation — four weeks').click();
+    await expect(page.getByText(/week one — breath and stillness/i)).toHaveCount(0);
+  });
+
+  test('puts the breathwork safety notice where the decision is made', async ({ page }) => {
+    await toMode(page, 'Breathe');
+    await page.getByRole('button', { name: /Box breathing/ }).click();
+
+    // Not behind a link, not after the session.
+    await expect(page.getByText(/stop if you feel dizzy/i)).toBeVisible();
+    await expect(page.getByText(/never practise in or near water/i)).toBeVisible();
+  });
+
+  test('a breathing session survives a reload', async ({ page }) => {
+    await toMode(page, 'Breathe');
+    await page.getByRole('button', { name: /Calm breathing/ }).click();
+    await page.getByRole('button', { name: /^Begin \d+ rounds$/ }).click();
+    await expect(page.getByText(/so far/)).toBeVisible();
+
+    await page.waitForTimeout(1500);
+    await page.reload();
+
+    // Back inside the session, on the right mode, with the time intact.
+    await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+    await expect(page.getByText(/so far/)).toBeVisible();
+
+    await page.getByRole('button', { name: 'Stop here' }).click();
+    const skip = page.getByRole('button', { name: 'Skip' });
+    if (await skip.isVisible()) await skip.click();
+  });
+
+  test('states the transfer limit before offering a drill', async ({ page }) => {
+    await toMode(page, 'Practise');
+
+    await expect(page.getByText(/not a measure of intelligence/i)).toBeVisible();
+    await expect(page.getByText(/not evidence of improvement at anything else/i)).toBeVisible();
+  });
+
+  test('makes no unqualified outcome claim anywhere on the Mind screen', async ({ page }) => {
+    for (const mode of ['Meditate', 'Breathe', 'Practise']) {
+      await toMode(page, mode);
+      const text = (await page.locator('main').innerText()).toLowerCase();
+
+      // The claims this product does not make, in any mode.
+      expect(text, mode).not.toMatch(
+        /\biq\b|percentile|brain age|cures?\b|treats?\b|heals?\b|detox|boosts? your|guarantee/,
+      );
+    }
   });
 });

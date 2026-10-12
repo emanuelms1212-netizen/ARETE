@@ -13,6 +13,7 @@ import {
 } from '@/domain';
 import { demoDays, demoSeed, type DemoSeed } from './demo-data';
 import { createMemoryDailySystem } from './memory/daily-system';
+import { createMemoryMind } from './memory/mind';
 import {
   RecordNotFoundError,
   type AccountExport,
@@ -99,6 +100,9 @@ export function createMemoryRepository(
   // shows the states the design has to survive rather than three empty ones.
   if (planSeed !== null) daily.seed(seedUserId, planSeed);
 
+  // Meditation, breathwork and cognitive practice.
+  const mind = createMemoryMind();
+
   function onboardingFor(userId: string): OnboardingRecord {
     let record = state.onboarding.get(userId);
     if (!record) {
@@ -149,6 +153,7 @@ export function createMemoryRepository(
   return {
     kind: 'memory',
     ...daily,
+    ...mind,
 
     async getOnboarding(userId: string) {
       return onboardingState(userId);

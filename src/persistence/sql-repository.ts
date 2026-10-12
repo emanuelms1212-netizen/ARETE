@@ -20,6 +20,7 @@ import {
   type UpsertDayInput,
 } from './repository';
 import { createSqlDailySystem } from './sql/daily-system';
+import { createSqlMind } from './sql/mind';
 import type { SqlExecutor } from './sql-executor';
 
 interface PlanRow {
@@ -131,6 +132,9 @@ export function createSqlRepository(executor: SqlExecutor): AreteRepository {
 
   // Goals, tasks, habits, the day's framing and the live timer.
   const daily = createSqlDailySystem(executor, { loadDay, requireDay, ensurePlan });
+
+  // Meditation, breathwork and cognitive practice.
+  const mind = createSqlMind(executor);
 
   // ---------------------------------------------------------------------
   // Onboarding
@@ -342,6 +346,7 @@ export function createSqlRepository(executor: SqlExecutor): AreteRepository {
   return {
     kind: 'sql',
     ...daily,
+    ...mind,
 
     async getOnboarding(userId: string) {
       return loadOnboarding(userId);

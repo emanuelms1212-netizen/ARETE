@@ -152,3 +152,41 @@ export {
   timerView,
 } from './focus';
 export type { FocusKind, FocusPreset, FocusSession, FocusStatus, TimerView } from './focus';
+export {
+  BREATHWORK_SAFETY,
+  BREATH_PRACTICES,
+  breathPatternSchema,
+  breathPhaseSchema,
+  breathPracticeBySlug,
+  breathStateAt,
+  cycleSeconds,
+  isConservative,
+  sessionSeconds,
+} from './breathwork';
+export type { BreathPattern, BreathPhase, BreathState, BreathworkPractice } from './breathwork';
+export {
+  DRILLS,
+  DRILL_DEFINITIONS,
+  TRANSFER_NOTE,
+  drillItemSchema,
+  generateArithmetic,
+  generateSequence,
+  nextDrill,
+  scoreItems,
+  seededRandom,
+  summarise,
+} from './cognitive';
+export type { Drill, DrillDefinition, DrillItem, DrillResult, PracticeCurve } from './cognitive';
+export {
+  MIND_KINDS,
+  MIND_STAGES,
+  RATING_LABELS,
+  describeOutcome,
+  finishMindPatch,
+  mindSessionSchema,
+  pauseMindPatch,
+  playerView,
+  practisedSeconds,
+  resumeMindPatch,
+} from './mind';
+export type { MindKind, MindSession, MindStage, PlayerView } from './mind';
