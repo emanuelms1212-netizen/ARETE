@@ -65,13 +65,13 @@ async function doRemainingMovements(page: Page) {
 }
 
 test.describe('flexibility: read-only', () => {
-  test('names its source and the rights status, and states the pain rule', async ({ page }) => {
+  test('names its source and that it is used with permission', async ({ page }) => {
     await page.goto('/train/flexibility');
     await expect(page.getByRole('heading', { level: 1, name: 'Flexibility' })).toBeVisible();
     await expect(page.getByText(/Total Flexibility - V2\.pdf/)).toBeVisible();
-    await expect(
-      page.getByText(/permission to use this structure has not been confirmed/),
-    ).toBeVisible();
+    // Cleared with the author's permission (D85): no demo-only warning.
+    await expect(page.getByText(/Used with the author’s permission/)).toBeVisible();
+    await expect(page.getByText(/has not been confirmed/)).toHaveCount(0);
   });
 
   test('is reachable from Train', async ({ page }) => {

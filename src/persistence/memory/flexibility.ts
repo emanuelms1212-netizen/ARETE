@@ -3,6 +3,7 @@ import {
   checkinSchema,
   flexItemSchema,
   flexWeekdaysSchema,
+  isProgramOffered,
   sessionKey,
   templateFor,
   type Checkin,
@@ -87,10 +88,8 @@ export function createMemoryFlexibility() {
 
   return {
     async listFlexPrograms(_userId: string, options: { readonly includeRightsPending: boolean }) {
-      return FLEX_PROGRAMS.filter(
-        (program) =>
-          program.rightsStatus === 'cleared' ||
-          (options.includeRightsPending && program.rightsStatus === 'pending'),
+      return FLEX_PROGRAMS.filter((program) =>
+        isProgramOffered(program.rightsStatus, options.includeRightsPending),
       ).map((program): FlexProgramListing => ({ program, rightsStatus: program.rightsStatus }));
     },
 
@@ -113,9 +112,7 @@ export function createMemoryFlexibility() {
     ) {
       const program = flexProgram(input.programSlug);
       if (!program) throw new InvalidWriteError('Unknown programme.');
-      const allowed =
-        program.rightsStatus === 'cleared' ||
-        (input.includeRightsPending && program.rightsStatus === 'pending');
+      const allowed = isProgramOffered(program.rightsStatus, input.includeRightsPending);
       if (!allowed) throw new InvalidWriteError('That programme is not available yet.');
       const weekdays = flexWeekdaysSchema.parse([...input.weekdays]);
 

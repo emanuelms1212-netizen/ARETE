@@ -3,6 +3,7 @@ import {
   checkinSchema,
   flexItemSchema,
   flexWeekdaysSchema,
+  isProgramOffered,
   sessionKey,
   templateFor,
   type Checkin,
@@ -208,9 +209,7 @@ export function createSqlFlexibility(executor: SqlExecutor) {
       const program = flexProgram(input.programSlug);
       const row = await programRow(input.programSlug);
       if (!program || !row) throw new InvalidWriteError('Unknown programme.');
-      const allowed =
-        row.rights_status === 'cleared' ||
-        (input.includeRightsPending && row.rights_status === 'pending');
+      const allowed = isProgramOffered(row.rights_status, input.includeRightsPending);
       if (!allowed) throw new InvalidWriteError('That programme is not available yet.');
       const weekdays = flexWeekdaysSchema.parse([...input.weekdays]);
 

@@ -29,6 +29,7 @@ interface SeededSource {
     | 'user-authored-personal'
     | 'public-domain'
     | 'third-party-permission-required'
+    | 'third-party-permission-granted'
     | 'third-party-no-redistribution';
   readonly rightsNote: string;
   readonly pages: number;
@@ -101,9 +102,9 @@ export const CONTENT_SOURCES: readonly SeededSource[] = [
     title: 'Total Flexibility V2 (four mobility programs)',
     filename: 'Total Flexibility - V2.pdf',
     author: 'David Thurin',
-    licence: 'third-party-permission-required',
+    licence: 'third-party-permission-granted',
     rightsNote:
-      'Commercial ebook. Movement names are common vocabulary; the programme structure needs written permission or must be re-derived. Descriptions rewritten in ARETE words; photographs never reproduced.',
+      'Commercial ebook, used with the author’s permission obtained by the product owner on 2026-10-19. Descriptions are still ARETE’s own words, and no photographs are reproduced.',
     pages: 72,
   },
 ];
@@ -157,7 +158,7 @@ export const CONTENT_PACKS: readonly SeededPack[] = [
     requiresExplicitChoice: false,
     requiresSafetyAcknowledgement: true,
     provenanceNote:
-      'Rights pending. Not served to users until permission is obtained or the progression is re-derived.',
+      'Session structure from Total Hamstring Mobility 2.0, used with the author’s permission (2026-10-19). Instructions are ARETE’s own.',
   },
 ];
 
@@ -304,7 +305,10 @@ export async function seedContent(executor: SqlExecutor): Promise<void> {
          (user_id, slug, name, region, weeks, days_per_week, content_pack_id, rights_status,
           rights_note, provenance_note)
        select null, $1, $2, $3, $4, $5, p.id, $6,
-              'Structure derived from a third-party commercial ebook. Needs written permission or re-derivation before release.',
+              case when $6 = 'cleared'
+                then 'Used with the author’s permission, obtained by the product owner on 2026-10-19.'
+                else 'Structure derived from a third-party commercial ebook. Needs written permission or re-derivation before release.'
+              end,
               $7
          from public.content_packs p where p.slug = $1
        on conflict (slug) where user_id is null do update set

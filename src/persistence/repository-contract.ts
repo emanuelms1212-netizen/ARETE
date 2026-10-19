@@ -1806,23 +1806,34 @@ export function describeRepositoryContract(
         clientToken: token,
       });
 
-      it('offers a programme with pending rights only when the caller allows it', async () => {
+      it('offers the hamstring programme, its rights cleared, with or without pending ones', async () => {
         const { repository, userId } = await fresh();
-        expect(await repository.listFlexPrograms(userId, { includeRightsPending: false })).toEqual(
-          [],
-        );
-        const listed = await repository.listFlexPrograms(userId, { includeRightsPending: true });
-        expect(listed.map((entry) => entry.program.slug)).toEqual(['hamstring-mobility']);
-        expect(listed[0]?.rightsStatus).toBe('pending');
+        for (const includeRightsPending of [false, true]) {
+          const listed = await repository.listFlexPrograms(userId, { includeRightsPending });
+          expect(listed.map((entry) => entry.program.slug)).toEqual(['hamstring-mobility']);
+          expect(listed[0]?.rightsStatus).toBe('cleared');
+        }
+        const enrolment = await repository.enrolFlex(userId, {
+          programSlug: 'hamstring-mobility',
+          startedOn: MONDAY,
+          weekdays: [1, 3, 5],
+          at: AT,
+          includeRightsPending: false,
+        });
+        expect(enrolment.status).toBe('active');
+      });
+
+      it('refuses a programme that does not exist', async () => {
+        const { repository, userId } = await fresh();
         await expect(
           repository.enrolFlex(userId, {
-            programSlug: 'hamstring-mobility',
+            programSlug: 'shoulder-mobility',
             startedOn: MONDAY,
             weekdays: [1, 3, 5],
             at: AT,
-            includeRightsPending: false,
+            includeRightsPending: true,
           }),
-        ).rejects.toThrow(/not available/);
+        ).rejects.toThrow(/Unknown programme/);
       });
 
       it('enrols on three chosen days, and starting again ends the old enrolment', async () => {

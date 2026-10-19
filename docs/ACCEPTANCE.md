@@ -739,8 +739,10 @@ travel; and the three Today metrics wrapped 2-then-1, so they became a three-col
 
 ### Rights
 
-- [x] The programme carries `rights_status = 'pending'` and is offered in demo mode only;
-      live mode shows an honest empty state (D78). Clearing it is one database update.
+- [x] Built behind a rights gate: a programme with pending rights is offered in demo mode only
+      (D78), and rights are read from the database so a re-seed never changes them
+- [x] **Cleared** — the author's permission was obtained on 2026-10-19; migration 0016 releases
+      the programme in live mode and records the source licence as permission-granted (D85)
 
 ### Verification
 
@@ -753,8 +755,7 @@ travel; and the three Today metrics wrapped 2-then-1, so they became a three-col
 
 ### Not done, and why
 
-- [ ] **Release outside demo mode** — waits on the rights decision (§7 of the ledger).
-- [ ] **Hip, posture and shoulder programmes** — same source, same rights question.
+- [ ] **Hip, posture and shoulder programmes** — same source, now cleared (D85); not yet built.
 - [ ] **Photo storage** — deliberately not built; no private storage exists yet.
 - [ ] **Animations for the remaining ten movements** — text instruction only for now.
 - [ ] **Migrations applied to a hosted database** — still no Supabase project.

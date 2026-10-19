@@ -37,16 +37,37 @@ describe('the seed', () => {
     );
     const licences = new Map(rows.rows.map((row) => [row.slug, row.licence]));
 
-    expect(licences.get('total-flexibility')).toBe('third-party-permission-required');
+    expect(licences.get('total-flexibility')).toBe('third-party-permission-granted');
     expect(licences.get('seed-oil-guide')).toBe('third-party-no-redistribution');
     expect(licences.get('jewish-meditation')).toBe('public-domain');
   });
 
-  it('keeps the flexibility programme unreleasable until its rights are settled', async () => {
+  it('ships the flexibility programme cleared, with the permission on record', async () => {
+    const rows = await database.db.query<{ rights_status: string; rights_note: string }>(
+      `select rights_status, rights_note from public.flexibility_programs
+        where slug = 'hamstring-mobility' and user_id is null`,
+    );
+    expect(rows.rows).toHaveLength(1);
+    expect(rows.rows[0]?.rights_status).toBe('cleared');
+    expect(rows.rows[0]?.rights_note).toMatch(/permission/);
+  });
+
+  it('never changes a programme’s rights on a re-seed, and never duplicates it', async () => {
+    // Rights belong to the product owner, in the database (D78). A re-seed
+    // must not undo a decision made there — in either direction.
+    await database.db.query(
+      `update public.flexibility_programs set rights_status = 'blocked'
+        where slug = 'hamstring-mobility' and user_id is null`,
+    );
+    await seedContent(executor);
     const rows = await database.db.query<{ rights_status: string }>(
       `select rights_status from public.flexibility_programs where slug = 'hamstring-mobility'`,
     );
-    expect(rows.rows[0]?.rights_status).toBe('pending');
+    expect(rows.rows.map((row) => row.rights_status)).toEqual(['blocked']);
+    await database.db.query(
+      `update public.flexibility_programs set rights_status = 'cleared'
+        where slug = 'hamstring-mobility' and user_id is null`,
+    );
   });
 
   it('marks the packs that may never be enabled by default', async () => {

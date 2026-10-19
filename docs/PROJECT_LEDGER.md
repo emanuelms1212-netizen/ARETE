@@ -145,11 +145,12 @@ suite — and the SQL one passes it _through_ row-level security, as the `authen
 | **D82** | **Self-reports are compared measure by measure, in words, with no total**           | Forward-fold reach, leg-raise range each side, tightness and two everyday tasks. Each line says "further", "looser", "the same" — never "better", never a score. Photos are not collected: the form says they stay on the person's phone, because there is no private storage yet and an AI must not score them                                                       | Yes         |
 | **D83** | **A severe flag routes to a professional instead of to the programme**              | Onboarding injuries and Train pain flags are both read. Severe on a region the programme loads: no enrolment, no start (refused on the server too), and a plain sentence about seeing a physiotherapist. Mild or moderate: every movement starts in its easier version                                                                                                | No          |
 | **D84** | **A flexibility step moves on only when the server has the record**                 | Moving to the next side locally, before the save returned, let sets be counted on a step that was about to be replaced. Found by the end-to-end journey, not by a unit test                                                                                                                                                                                           | No          |
+| **D85** | **The Total Flexibility material is cleared: the author gave permission**           | The product owner obtained David Thurin's permission for the Total Flexibility material on 2026-10-19. Migration 0016 clears the programme and records the source as `third-party-permission-granted`; the seed ships it cleared. The rights gate (D78) stays for anything not yet settled, and a re-seed still never changes a rights decision                       | Yes         |
 
 ## 3. Data model
 
 51 tables. The full account is in **`docs/DATA_MODEL.md`**; the schema itself is
-`supabase/migrations/0001` through `0015`. Stage 9 added `flexibility_enrolments` (three
+`supabase/migrations/0001` through `0016`. Stage 9 added `flexibility_enrolments` (three
 chosen days, one active per programme) and `flexibility_checkins` (the weekly self-report),
 and gave `flexibility_sessions` a status, the warm-up chosen, per-movement items, notes and
 skip reasons. Stage 8 added `workout_sessions` (a workout as
@@ -168,7 +169,7 @@ Five conventions run through all of it: ownership by `user_id` with RLS; local d
 zone stored beside the date; template / instance / log as separate tables; one unit system in
 storage; and `client_token` on every write a retry might repeat.
 
-**Migrations:** 15, applying from zero, proven in `src/persistence/rls.test.ts`.
+**Migrations:** 16, applying from zero, proven in `src/persistence/rls.test.ts`.
 **Applied once, and proven:** `public.schema_migrations` records every applied file with a
 checksum (D39). A test asserts that a second `db:migrate` applies nothing, and that an
 already-applied file which has since been edited fails loudly rather than diverging quietly.
@@ -233,10 +234,10 @@ already-applied file which has since been edited fails loudly rather than diverg
     say so. Front views exist for the squat and the split squat. Runs are prescribed by time,
     not distance. Loads are shown in kilograms only. Deloads are reactive (D67), not planned
     weeks. The week is the same every week until the setup or the history changes it.
-14. **Flexibility: what is not there yet.** One programme (hamstrings). The source also has hip,
-    posture and shoulder programmes; they wait on the same rights decision (D77). Photos for the
+14. **Flexibility: what is not there yet.** One programme (hamstrings). Photos for the
     check-in are not stored (D82). Hold timers are local to the page, so a reload mid-hold
-    restarts that hold. Four of the fifteen main movements are
+    restarts that hold. The hip, posture and shoulder programmes from the same source are now
+    cleared too (D85) and can be built the same way. Four of the fifteen main movements are
     animated (plus two warm-up movers); the rest are text.
 15. **Playwright cannot run on the build machine**: no browser, and the network allowlist
     blocks `cdn.playwright.dev`. The suite runs in CI with Playwright's own Chromium, and is
@@ -245,17 +246,17 @@ already-applied file which has since been edited fails loudly rather than diverg
 
 ## 7. Open risks
 
-| Risk                                                       | Severity | Owner                          | Note                                                                                                                                                                                                                                                                                                                            |
-| ---------------------------------------------------------- | -------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Rights to ship the `Total Flexibility` programme structure | **High** | Product owner                  | Third-party commercial ebook. Built as a sourced template and **offered in demo mode only** (D77, D78). To release it: obtain written permission from David Thurin, then `update public.flexibility_programs set rights_status = 'cleared' where slug = 'hamstring-mobility' and user_id is null`. Or re-derive the progression |
-| Contrast-therapy safety                                    | **High** | Product + a qualified reviewer | 70–82 °C sauna, 13 °C immersion, no screening in the source. The pack is flagged `requires_safety_acknowledgement`, and `safety_acknowledgements` gates it                                                                                                                                                                      |
-| Seed-oil content is contested and copyrighted              | Medium   | Product owner                  | Seeded as `third-party-no-redistribution`. At most one optional labelled note                                                                                                                                                                                                                                                   |
-| Exercise animations were drawn by an engineer              | Medium   | A coach or physiotherapist     | Nine original keyframe animations, held to kinematic and form checks in tests. They are labelled instructional aids, not form assessment; a qualified reviewer should still look at each before launch                                                                                                                          |
-| No infrastructure                                          | Medium   | Engineering                    | §8                                                                                                                                                                                                                                                                                                                              |
-| **The safety rules have not been reviewed by a clinician** | **High** | Product + a qualified reviewer | The rules in `src/domain/safety.ts` are conservative and tested, but they were written by an engineer reading source PDFs. Pregnancy, cardiovascular and injury gating is exactly the kind of judgement that needs a professional to sign it off before real users meet it                                                      |
-| Screen-reader testing has not been done                    | Medium   | Engineering                    | Stage 13                                                                                                                                                                                                                                                                                                                        |
-| No backup or restore procedure                             | Medium   | Engineering                    | Needed before any real user data exists                                                                                                                                                                                                                                                                                         |
-| Unattributed quotes in a source PDF                        | Low      | Content                        | The schema now refuses to attribute anything unverified                                                                                                                                                                                                                                                                         |
+| Risk                                                       | Severity | Owner                          | Note                                                                                                                                                                                                                                                                       |
+| ---------------------------------------------------------- | -------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Written permission for Total Flexibility must stay on file | Low      | Product owner                  | Cleared on 2026-10-19 (D85). Keep the written permission somewhere durable; if it is ever withdrawn, set `rights_status = 'blocked'` and the programme disappears everywhere with no deploy                                                                                |
+| Contrast-therapy safety                                    | **High** | Product + a qualified reviewer | 70–82 °C sauna, 13 °C immersion, no screening in the source. The pack is flagged `requires_safety_acknowledgement`, and `safety_acknowledgements` gates it                                                                                                                 |
+| Seed-oil content is contested and copyrighted              | Medium   | Product owner                  | Seeded as `third-party-no-redistribution`. At most one optional labelled note                                                                                                                                                                                              |
+| Exercise animations were drawn by an engineer              | Medium   | A coach or physiotherapist     | Nine original keyframe animations, held to kinematic and form checks in tests. They are labelled instructional aids, not form assessment; a qualified reviewer should still look at each before launch                                                                     |
+| No infrastructure                                          | Medium   | Engineering                    | §8                                                                                                                                                                                                                                                                         |
+| **The safety rules have not been reviewed by a clinician** | **High** | Product + a qualified reviewer | The rules in `src/domain/safety.ts` are conservative and tested, but they were written by an engineer reading source PDFs. Pregnancy, cardiovascular and injury gating is exactly the kind of judgement that needs a professional to sign it off before real users meet it |
+| Screen-reader testing has not been done                    | Medium   | Engineering                    | Stage 13                                                                                                                                                                                                                                                                   |
+| No backup or restore procedure                             | Medium   | Engineering                    | Needed before any real user data exists                                                                                                                                                                                                                                    |
+| Unattributed quotes in a source PDF                        | Low      | Content                        | The schema now refuses to attribute anything unverified                                                                                                                                                                                                                    |
 
 ## 8. Exact next step
 
@@ -284,11 +285,6 @@ credentials at all.
 The safety rules need a clinical reviewer before real users meet them (§7). The rules are
 written, conservative and tested; what is missing is a professional saying so. This is not
 blocking stage 6, but it blocks launch.
-
-### Also waiting on the product owner: the flexibility rights
-
-The hamstring programme is built and works end to end, but it is offered only in demo mode
-until its rights are cleared (D78, §7). It is one database update once permission exists.
 
 ### Then: stage 10 — nutrition and calorie tracking
 

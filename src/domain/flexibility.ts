@@ -78,6 +78,14 @@ export interface FlexProgram {
   readonly rightsStatus: RightsStatus;
 }
 
+/**
+ * Whether a programme may be offered. Cleared always; pending only where the
+ * caller allows it (demo mode); blocked never.
+ */
+export function isProgramOffered(status: RightsStatus, includeRightsPending: boolean): boolean {
+  return status === 'cleared' || (includeRightsPending && status === 'pending');
+}
+
 export function sessionKey(week: number, day: number): string {
   return `w${week}d${day}`;
 }

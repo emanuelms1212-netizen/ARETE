@@ -12,6 +12,7 @@ export const sourceLicenseSchema = z.enum([
   'user-authored-personal',
   'public-domain',
   'third-party-permission-required',
+  'third-party-permission-granted',
   'third-party-no-redistribution',
 ]);
 

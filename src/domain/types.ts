@@ -81,6 +81,7 @@ export interface Provenance {
     | 'user-authored-personal'
     | 'public-domain'
     | 'third-party-permission-required'
+    | 'third-party-permission-granted'
     | 'third-party-no-redistribution';
   readonly provenanceNote?: string;
 }

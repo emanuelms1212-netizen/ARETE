@@ -7,6 +7,7 @@ import {
   compareCheckins,
   flexEligibility,
   flexWeekdaysSchema,
+  isProgramOffered,
   programState,
   sessionKey,
   type Checkin,
@@ -243,5 +244,14 @@ describe('schedule', () => {
     expect(flexWeekdaysSchema.safeParse([1, 3, 5]).success).toBe(true);
     expect(flexWeekdaysSchema.safeParse([1, 3]).success).toBe(false);
     expect(flexWeekdaysSchema.safeParse([1, 1, 3]).success).toBe(false);
+  });
+});
+
+describe('isProgramOffered', () => {
+  it('offers cleared always, pending only when allowed, blocked never', () => {
+    expect(isProgramOffered('cleared', false)).toBe(true);
+    expect(isProgramOffered('pending', false)).toBe(false);
+    expect(isProgramOffered('pending', true)).toBe(true);
+    expect(isProgramOffered('blocked', true)).toBe(false);
   });
 });

@@ -51,10 +51,11 @@ describe('hamstring programme', () => {
     expect(noImpact).not.toContain('high-knees');
   });
 
-  it('points back to the source, and says its rights are pending', () => {
+  it('points back to the source, and records that its rights are cleared', () => {
     expect(HAMSTRING_PROGRAM.provenance.filename).toBe('Total Flexibility - V2.pdf');
     expect(HAMSTRING_PROGRAM.provenance.note).toMatch(/ARETE’s own summaries/);
-    expect(HAMSTRING_PROGRAM.rightsStatus).toBe('pending');
+    expect(HAMSTRING_PROGRAM.rightsStatus).toBe('cleared');
+    expect(HAMSTRING_PROGRAM.provenance.note).toMatch(/permission/);
   });
 
   it('carries no promise it cannot keep', () => {

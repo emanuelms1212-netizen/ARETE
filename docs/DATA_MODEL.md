@@ -39,23 +39,24 @@ duplicate. A focus session recorded three times is one row.
 
 ## 2. The tables
 
-| Migration             | Tables                                                                                                                                                                  |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `0001_foundation`     | Helper functions: `set_updated_at`, `attach_updated_at`, `current_user_id`                                                                                              |
-| `0002_identity`       | `profiles`, `preferences`, `onboarding_answers`, `notification_preferences`, `safety_acknowledgements`                                                                  |
-| `0003_planning`       | `goals`, `milestones`, `projects`, `tasks`, `task_occurrences`, `habits`, `habit_schedules`, `habit_logs`, `daily_plans`, `daily_plan_items`                            |
-| `0004_sessions`       | `focus_sessions`, `meditation_sessions`, `breathwork_sessions`, `cognitive_sessions`                                                                                    |
-| `0005_training`       | `exercises`, `exercise_animation_assets`, `workout_plans`, `workout_days`, `workout_exercises`, `workout_logs`, `flexibility_programs`, `flexibility_sessions`          |
-| `0006_nutrition_body` | `nutrition_targets`, `foods`, `meals`, `food_entries`, `body_metrics`                                                                                                   |
-| `0007_content`        | `content_sources`, `content_packs`, `quotes`, `journal_entries`                                                                                                         |
-| `0008_analytics`      | `analytics_events`                                                                                                                                                      |
-| `0009_rls`            | Policies and grants for all of the above                                                                                                                                |
-| `0010_export_delete`  | `export_my_data()`, `delete_my_account()`                                                                                                                               |
-| `0011_onboarding`     | `onboarding_progress`, `health_profile`, `training_profile`, `nutrition_profile`, `mind_profile`, `plan_drafts`                                                         |
-| `0012_daily_system`   | `goal_measurements`, `goal_reviews`, `day_reviews`; habit kinds, task subtasks, the day's framing, the focus timer's pause state                                        |
-| `0013_mind`           | `mind_practices`, `user_content_packs`; the shared player columns on the three Mind session tables                                                                      |
-| `0014_train`          | `workout_sessions`; set-level columns on `workout_logs`; instruction text on `exercises`; plan inputs on `training_profile`                                             |
-| `0015_flexibility`    | `flexibility_enrolments`, `flexibility_checkins`; status, warm-up, items, notes and skip reason on `flexibility_sessions`; library slug index on `flexibility_programs` |
+| Migration                 | Tables                                                                                                                                                                  |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0001_foundation`         | Helper functions: `set_updated_at`, `attach_updated_at`, `current_user_id`                                                                                              |
+| `0002_identity`           | `profiles`, `preferences`, `onboarding_answers`, `notification_preferences`, `safety_acknowledgements`                                                                  |
+| `0003_planning`           | `goals`, `milestones`, `projects`, `tasks`, `task_occurrences`, `habits`, `habit_schedules`, `habit_logs`, `daily_plans`, `daily_plan_items`                            |
+| `0004_sessions`           | `focus_sessions`, `meditation_sessions`, `breathwork_sessions`, `cognitive_sessions`                                                                                    |
+| `0005_training`           | `exercises`, `exercise_animation_assets`, `workout_plans`, `workout_days`, `workout_exercises`, `workout_logs`, `flexibility_programs`, `flexibility_sessions`          |
+| `0006_nutrition_body`     | `nutrition_targets`, `foods`, `meals`, `food_entries`, `body_metrics`                                                                                                   |
+| `0007_content`            | `content_sources`, `content_packs`, `quotes`, `journal_entries`                                                                                                         |
+| `0008_analytics`          | `analytics_events`                                                                                                                                                      |
+| `0009_rls`                | Policies and grants for all of the above                                                                                                                                |
+| `0010_export_delete`      | `export_my_data()`, `delete_my_account()`                                                                                                                               |
+| `0011_onboarding`         | `onboarding_progress`, `health_profile`, `training_profile`, `nutrition_profile`, `mind_profile`, `plan_drafts`                                                         |
+| `0012_daily_system`       | `goal_measurements`, `goal_reviews`, `day_reviews`; habit kinds, task subtasks, the day's framing, the focus timer's pause state                                        |
+| `0013_mind`               | `mind_practices`, `user_content_packs`; the shared player columns on the three Mind session tables                                                                      |
+| `0014_train`              | `workout_sessions`; set-level columns on `workout_logs`; instruction text on `exercises`; plan inputs on `training_profile`                                             |
+| `0015_flexibility`        | `flexibility_enrolments`, `flexibility_checkins`; status, warm-up, items, notes and skip reason on `flexibility_sessions`; library slug index on `flexibility_programs` |
+| `0016_flexibility_rights` | Clears the hamstring programme and adds the `third-party-permission-granted` licence (ledger D85)                                                                       |
 
 `daily_plan_items` is the one table not in the brief's list. A `daily_plans` row on its own
 cannot represent a day; this is the commitment the Today screen renders.

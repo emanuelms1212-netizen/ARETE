@@ -40,7 +40,7 @@ like — and every one of the fifty has a full text instruction.
 Flexibility is live in demo mode: a four-week hamstring programme built from the source's
 structure in ARETE's own words, three sessions a week on days the person chooses, done in any
 order, with a warm-up gate, a pain exit that is always on screen, and weekly self-reports
-compared in words. It waits on a content-rights decision before it is offered in live mode.
+compared in words. It is used with the source author's permission.
 
 Progress still renders an honest "not built yet" state naming the stage that builds it.
 

@@ -202,7 +202,12 @@ contact → supplement promotion ("Flexy Joints") with a discount code → **dis
 | 3    | Sit & Reach (Reps) 1×10 · Sit & Reach (Hold) 1×30 s · Flat Back Hamstring Stretch 2×30 s | Crossbody Leg Swings 1×15 · Standing Pancake 1×30 s · Pancake 2×30 s                     | Standing Pancake Good Morning 1×10 · Hamstring Chokes 1×15 · Toe Touch 2×30 s            |
 | 4    | Roll Down 1×10 · Standing Pancake Good Morning 1×10 · Crossbody Hamstring Stretch 2×30 s | Standing Pancake Good Morning 1×10 · Hamstring Chokes 1×15 · Toe Touch 2×30 s            | Roll Down 1×10 · Standing Pancake Good Morning 1×10 · Crossbody Hamstring Stretch 2×30 s |
 
-### Rights — REQUIRES PERMISSION BEFORE SHIPPING
+### Rights — PERMISSION GRANTED (2026-10-19)
+
+The product owner obtained David Thurin's permission for the Total Flexibility material on
+2026-10-19 (ledger D85). The table below is kept as the record of what was weighed; ARETE
+still writes its own instructions and draws its own animations, and still does not carry the
+author's promotions.
 
 | Element                                                                 | Status                                                                                  |
 | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
@@ -213,14 +218,10 @@ contact → supplement promotion ("Flexy Joints") with a discount code → **dis
 | **Author name, branding, "Flexy Joints" promotion, discount code**      | Not shipped                                                                             |
 
 **Stage 9 (2026-10-19):** built as a sourced template — the structure above, exactly, with
-ARETE-written instructions — and **offered in demo mode only** while `rights_status` is
-`pending` (ledger D77, D78). Clearing it is one database update.
+ARETE-written instructions — behind a rights gate (ledger D77, D78). **Cleared the same day**
+when permission arrived (D85, migration 0016).
 
-**Open action for the user:** decide whether to (a) obtain written permission from David Thurin
-to ship the program structure with attribution, or (b) have ARETE generate its own progression
-from the movement vocabulary. Until that is decided, the flexibility module ships **structure-only,
-with ARETE-authored cueing text and ARETE-authored animations.** Recorded as an open risk in
-`PROJECT_LEDGER.md`.
+**Resolved 2026-10-19:** option (a) — written permission obtained by the product owner.
 
 ### Safety
 
@@ -245,12 +246,12 @@ offers a regression for every movement, and never counts a skipped movement as f
 
 ## What may be shipped, at a glance
 
-| Source            | Ship verbatim?                 | Ship structure?        | Notes                                                                      |
-| ----------------- | ------------------------------ | ---------------------- | -------------------------------------------------------------------------- |
-| 66-Day Reset      | No (user's own, but restated)  | **Yes**                | Flagship optional program; every parameter editable                        |
-| Reset pamphlet    | No                             | Yes                    | Merged into the above                                                      |
-| Teen regimen      | No                             | Partial                | PPL 4-phase shape only                                                     |
-| Contrast therapy  | No                             | Yes, opt-in            | Safety gate mandatory; conservative defaults                               |
-| Jewish meditation | Yes (liturgy is public domain) | Yes                    | Never enabled by default or inferred                                       |
-| Seed oil guide    | **No**                         | **No**                 | Third-party copyright; contested viewpoint; optional labelled note at most |
-| Total Flexibility | **No**                         | **Pending permission** | ARETE-authored cues and animations; open rights question                   |
+| Source            | Ship verbatim?                 | Ship structure?      | Notes                                                                      |
+| ----------------- | ------------------------------ | -------------------- | -------------------------------------------------------------------------- |
+| 66-Day Reset      | No (user's own, but restated)  | **Yes**              | Flagship optional program; every parameter editable                        |
+| Reset pamphlet    | No                             | Yes                  | Merged into the above                                                      |
+| Teen regimen      | No                             | Partial              | PPL 4-phase shape only                                                     |
+| Contrast therapy  | No                             | Yes, opt-in          | Safety gate mandatory; conservative defaults                               |
+| Jewish meditation | Yes (liturgy is public domain) | Yes                  | Never enabled by default or inferred                                       |
+| Seed oil guide    | **No**                         | **No**               | Third-party copyright; contested viewpoint; optional labelled note at most |
+| Total Flexibility | **No** (own words by choice)   | **Yes — permission** | Permission granted 2026-10-19; ARETE-authored cues and animations          |

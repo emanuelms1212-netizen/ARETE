@@ -11,9 +11,9 @@ import type { FlexMovement, FlexPrescription, FlexProgram } from '@/domain/flexi
  * source is reproduced, and the author's branding and promotions are not
  * carried. Names are normalised ("Crossbody" → "Cross-body").
  *
- * Rights to the structure are still pending (SOURCE_MAP §7, ledger §7). The
- * programme carries that status with it, and the repository only offers a
- * pending programme where the caller allows it — demo mode, today.
+ * The product owner obtained the author's permission on 2026-10-19 (ledger
+ * D85), so the programme ships with `rightsStatus: 'cleared'`. The rights
+ * gate stays in place for any future programme whose rights are not settled.
  *
  * Where the source gives a range (the warm-up's 10–15 reps), ARETE uses the
  * bottom of it. Where it gives a number, ARETE keeps it, because those numbers
@@ -521,9 +521,9 @@ export const HAMSTRING_PROGRAM: FlexProgram = {
   provenance: {
     sourceSlug: 'total-flexibility',
     filename: 'Total Flexibility - V2.pdf',
-    note: 'Session structure (movements, sets, reps and holds) follows the four-week hamstring programme in "Total Hamstring Mobility 2.0", part of Total Flexibility V2. Instructions are ARETE’s own summaries; no text or images from the source are reproduced.',
+    note: 'Session structure (movements, sets, reps and holds) follows the four-week hamstring programme in "Total Hamstring Mobility 2.0", part of Total Flexibility V2. Used with the author’s permission. Instructions are ARETE’s own summaries; no text or images from the source are reproduced.',
   },
-  rightsStatus: 'pending',
+  rightsStatus: 'cleared',
 };
 
 export const FLEX_PROGRAMS: readonly FlexProgram[] = [HAMSTRING_PROGRAM];
