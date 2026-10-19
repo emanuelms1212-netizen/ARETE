@@ -1,4 +1,5 @@
 import { ALL_PRACTICES } from '@/content/mind/practices';
+import { FLEX_PROGRAMS } from '@/content/flexibility/hamstring';
 import { EXERCISES } from '@/content/train/exercises';
 import type { SqlExecutor } from './sql-executor';
 import { DEMO_USER_ID, demoDays } from './demo-data';
@@ -295,14 +296,31 @@ export async function seedContent(executor: SqlExecutor): Promise<void> {
   }
 
   // The flexibility programme is shipped with its rights status, not without it.
-  await executor.query(
-    `insert into public.flexibility_programs
-       (user_id, slug, name, region, weeks, days_per_week, content_pack_id, rights_status, rights_note)
-     select null, 'hamstring-mobility', 'Hamstring mobility', 'hamstrings', 4, 3, p.id, 'pending',
-            'Structure derived from a third-party commercial ebook. Needs written permission or re-derivation before release.'
-       from public.content_packs p where p.slug = 'hamstring-mobility'
-     on conflict (user_id, slug) do nothing`,
-  );
+  // A re-seed refreshes the description but never the rights status: once the
+  // product owner has cleared it in the database, seeding must not undo that.
+  for (const program of FLEX_PROGRAMS) {
+    await executor.query(
+      `insert into public.flexibility_programs
+         (user_id, slug, name, region, weeks, days_per_week, content_pack_id, rights_status,
+          rights_note, provenance_note)
+       select null, $1, $2, $3, $4, $5, p.id, $6,
+              'Structure derived from a third-party commercial ebook. Needs written permission or re-derivation before release.',
+              $7
+         from public.content_packs p where p.slug = $1
+       on conflict (slug) where user_id is null do update set
+         name = excluded.name, region = excluded.region, weeks = excluded.weeks,
+         days_per_week = excluded.days_per_week, provenance_note = excluded.provenance_note`,
+      [
+        program.slug,
+        program.title,
+        program.region,
+        program.weeks,
+        program.sessionsPerWeek,
+        program.rightsStatus,
+        program.provenance.note,
+      ],
+    );
+  }
 
   // One line of ARETE's own, carrying no author — the schema forbids attributing
   // anything that has not been verified.

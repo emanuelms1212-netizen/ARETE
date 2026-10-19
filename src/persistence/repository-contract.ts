@@ -1780,6 +1780,237 @@ export function describeRepositoryContract(
       });
     });
 
+    describe('flexibility', () => {
+      const AT = new Date('2026-03-02T07:00:00.000Z');
+      const MONDAY = '2026-03-02';
+
+      async function enrolled() {
+        const subject = await fresh();
+        const enrolment = await subject.repository.enrolFlex(subject.userId, {
+          programSlug: 'hamstring-mobility',
+          startedOn: MONDAY,
+          weekdays: [1, 3, 5],
+          at: AT,
+          includeRightsPending: true,
+        });
+        return { ...subject, enrolment };
+      }
+
+      const start = (enrolmentId: string, week: number, day: number, token: string) => ({
+        enrolmentId,
+        week,
+        day,
+        localDate: MONDAY,
+        timeZone: ZONE,
+        startedAt: AT,
+        clientToken: token,
+      });
+
+      it('offers a programme with pending rights only when the caller allows it', async () => {
+        const { repository, userId } = await fresh();
+        expect(await repository.listFlexPrograms(userId, { includeRightsPending: false })).toEqual(
+          [],
+        );
+        const listed = await repository.listFlexPrograms(userId, { includeRightsPending: true });
+        expect(listed.map((entry) => entry.program.slug)).toEqual(['hamstring-mobility']);
+        expect(listed[0]?.rightsStatus).toBe('pending');
+        await expect(
+          repository.enrolFlex(userId, {
+            programSlug: 'hamstring-mobility',
+            startedOn: MONDAY,
+            weekdays: [1, 3, 5],
+            at: AT,
+            includeRightsPending: false,
+          }),
+        ).rejects.toThrow(/not available/);
+      });
+
+      it('enrols on three chosen days, and starting again ends the old enrolment', async () => {
+        const { repository, userId, enrolment } = await enrolled();
+        expect(enrolment.weekdays).toEqual([1, 3, 5]);
+        expect(enrolment.status).toBe('active');
+        expect((await repository.getActiveEnrolment(userId, 'hamstring-mobility'))?.id).toBe(
+          enrolment.id,
+        );
+
+        const again = await repository.enrolFlex(userId, {
+          programSlug: 'hamstring-mobility',
+          startedOn: '2026-03-09',
+          weekdays: [0, 2, 4],
+          at: new Date('2026-03-09T07:00:00Z'),
+          includeRightsPending: true,
+        });
+        expect(again.id).not.toBe(enrolment.id);
+        expect((await repository.getActiveEnrolment(userId, 'hamstring-mobility'))?.id).toBe(
+          again.id,
+        );
+        await expect(
+          repository.enrolFlex(userId, {
+            programSlug: 'hamstring-mobility',
+            startedOn: MONDAY,
+            weekdays: [1, 3],
+            at: AT,
+            includeRightsPending: true,
+          }),
+        ).rejects.toThrow();
+      });
+
+      it('changes the schedule without touching progress', async () => {
+        const { repository, userId, enrolment } = await enrolled();
+        const moved = await repository.setFlexSchedule(userId, enrolment.id, [2, 4, 6]);
+        expect(moved.weekdays).toEqual([2, 4, 6]);
+      });
+
+      it('runs one session at a time, records its warm-up, items and notes, and finishes once', async () => {
+        const { repository, userId, enrolment } = await enrolled();
+        const running = await repository.startFlexSession(userId, start(enrolment.id, 1, 3, 'f-1'));
+        expect(
+          (await repository.startFlexSession(userId, start(enrolment.id, 1, 3, 'f-1'))).id,
+        ).toBe(running.id);
+        await expect(
+          repository.startFlexSession(userId, start(enrolment.id, 1, 1, 'f-2')),
+        ).rejects.toThrow(/already running/);
+
+        await repository.updateFlexSession(userId, running.id, { warmup: 'no_impact' });
+        const updated = await repository.updateFlexSession(userId, running.id, {
+          items: [
+            {
+              movementSlug: 'hamstring-kicks',
+              side: 'left',
+              setsDone: 1,
+              easier: false,
+              intensity: 4,
+            },
+          ],
+          notes: 'Left side tighter.',
+        });
+        expect(updated.warmup).toBe('no_impact');
+        expect(updated.items[0]).toMatchObject({
+          movementSlug: 'hamstring-kicks',
+          side: 'left',
+          intensity: 4,
+        });
+        expect((await repository.getRunningFlexSession(userId))?.id).toBe(running.id);
+
+        const done = await repository.finishFlexSession(userId, {
+          sessionId: running.id,
+          status: 'completed',
+          at: new Date(AT.getTime() + 900_000),
+        });
+        expect(done.status).toBe('completed');
+        expect(done.notes).toBe('Left side tighter.');
+        expect(done.painReported).toBe(false);
+        expect(await repository.getRunningFlexSession(userId)).toBeNull();
+        await expect(
+          repository.updateFlexSession(userId, running.id, { notes: 'late' }),
+        ).rejects.toThrow(/already finished/);
+        // A slot closes once.
+        await expect(
+          repository.startFlexSession(userId, start(enrolment.id, 1, 3, 'f-3')),
+        ).rejects.toThrow(/already done/);
+      });
+
+      it('records a stop as pain, and leaves the slot open to try again', async () => {
+        const { repository, userId, enrolment } = await enrolled();
+        const running = await repository.startFlexSession(userId, start(enrolment.id, 1, 1, 'f-1'));
+        const stopped = await repository.finishFlexSession(userId, {
+          sessionId: running.id,
+          status: 'stopped',
+          at: new Date(AT.getTime() + 300_000),
+          painNote: 'Sharp at the back of the knee',
+        });
+        expect(stopped.status).toBe('stopped');
+        expect(stopped.painReported).toBe(true);
+        expect(stopped.painNote).toBe('Sharp at the back of the knee');
+        const retry = await repository.startFlexSession(userId, start(enrolment.id, 1, 1, 'f-2'));
+        expect(retry.status).toBe('running');
+      });
+
+      it('skips with a reason, and refuses a skip without one or a slot that does not exist', async () => {
+        const { repository, userId, enrolment } = await enrolled();
+        const skip = {
+          enrolmentId: enrolment.id,
+          week: 1,
+          day: 2,
+          localDate: MONDAY,
+          timeZone: ZONE,
+          at: AT,
+        };
+        await expect(repository.skipFlexSession(userId, { ...skip, reason: '  ' })).rejects.toThrow(
+          /reason/,
+        );
+        const skipped = await repository.skipFlexSession(userId, { ...skip, reason: 'Travelling' });
+        expect(skipped.status).toBe('skipped');
+        expect(skipped.skipReason).toBe('Travelling');
+        await expect(
+          repository.skipFlexSession(userId, { ...skip, reason: 'Again' }),
+        ).rejects.toThrow(/already done/);
+        await expect(
+          repository.skipFlexSession(userId, { ...skip, week: 9, reason: 'x' }),
+        ).rejects.toThrow(/no session/);
+        expect(await repository.listFlexSessions(userId, enrolment.id)).toHaveLength(1);
+      });
+
+      it('keeps one check-in per week, corrected by saving again', async () => {
+        const { repository, userId, enrolment } = await enrolled();
+        const checkin = {
+          week: 0,
+          toeTouch: 'mid_shin' as const,
+          legRaiseLeft: 'to_70' as const,
+          legRaiseRight: 'below_45' as const,
+          tightness: 7,
+          socks: 'some_effort' as const,
+          pickUp: 'hard' as const,
+          pain: 'none' as const,
+          notes: null,
+        };
+        await repository.saveFlexCheckin(userId, {
+          enrolmentId: enrolment.id,
+          localDate: MONDAY,
+          checkin,
+        });
+        await repository.saveFlexCheckin(userId, {
+          enrolmentId: enrolment.id,
+          localDate: MONDAY,
+          checkin: { ...checkin, tightness: 6 },
+        });
+        await repository.saveFlexCheckin(userId, {
+          enrolmentId: enrolment.id,
+          localDate: '2026-03-07',
+          checkin: { ...checkin, week: 1, toeTouch: 'ankles' },
+        });
+        const list = await repository.listFlexCheckins(userId, enrolment.id);
+        expect(list.map((entry) => entry.week)).toEqual([0, 1]);
+        expect(list[0]?.tightness).toBe(6);
+        expect(list[1]).toMatchObject({ toeTouch: 'ankles', localDate: '2026-03-07' });
+        await expect(
+          repository.saveFlexCheckin(userId, {
+            enrolmentId: enrolment.id,
+            localDate: MONDAY,
+            checkin: { ...checkin, tightness: 12 },
+          }),
+        ).rejects.toThrow();
+      });
+
+      it('ends an enrolment once', async () => {
+        const { repository, userId, enrolment } = await enrolled();
+        const ended = await repository.endFlexEnrolment(
+          userId,
+          enrolment.id,
+          'completed',
+          new Date('2026-04-01T08:00:00Z'),
+        );
+        expect(ended.status).toBe('completed');
+        expect(
+          (await repository.endFlexEnrolment(userId, enrolment.id, 'ended', new Date())).status,
+        ).toBe('completed');
+        expect(await repository.getActiveEnrolment(userId, 'hamstring-mobility')).toBeNull();
+        await expect(
+          repository.startFlexSession(userId, start(enrolment.id, 1, 1, 'f-9')),
+        ).rejects.toThrow(/no longer active/);
+      });
+    });
+
     it('deletes everything, and means it', async () => {
       const { repository, userId } = await fresh();
       await repository.upsertDay(userId, {

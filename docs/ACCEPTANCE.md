@@ -687,7 +687,79 @@ travel; and the three Today metrics wrapped 2-then-1, so they became a three-col
       a coach or physiotherapist should look at each before launch.
 - [ ] **Migrations applied to a hosted database** — still no Supabase project.
 
-## Stages 9–17 — not started
+## Stage 9 — Flexibility: the four-week hamstring programme
 
-Tracked in `docs/PROJECT_LEDGER.md` §8. No item below stage 9 may be ticked before the
+### The programme
+
+- [x] Four weeks, three sessions a week, from the source's own table — pinned by a test (D77)
+- [x] Flexible day assignment: three days chosen at the start, changeable at any time
+- [x] Sessions in any order within a week; progress moves by completion, not the calendar (D79)
+- [x] Missed-day recovery: a passed day moves the suggestion; after two weeks away, every
+      movement starts in its easier version
+- [x] Continuation and maintenance guidance once all twelve are closed, and "start again"
+- [x] Required warm-up — walking lunges, leg swings, high knees, jog in place, two sets each at
+      the bottom of the source's range — with a no-impact route and an "already warm" route (D81)
+- [x] Fifteen named movements, plus the five warm-up movers, each with ARETE-written steps,
+      cues, mistakes, stop conditions and an easier version; names normalised
+- [x] The source's sets, reps and holds kept; easier versions always available
+- [x] Loaded end-range positions (pancake, standing pancake, roll down) flagged and cautioned
+- [x] Provenance shown on screen and stored, pointing to `Total Flexibility - V2.pdf`
+- [x] No promise that stretching prevents injury, and no guaranteed result — asserted by test
+- [x] No author branding, promotion or discount code carried over — asserted by test
+
+### Check-ins
+
+- [x] Baseline at enrolment (skippable), then one per finished week
+- [x] Pain-free range (forward fold; straight-leg raise each side), perceived tightness, and
+      two functional markers (socks standing; picking something up)
+- [x] **Weekly self-reports compared** measure by measure, in words, with no score (D82)
+- [x] Photos optional and private: not collected, and the form says so
+
+### The session player
+
+- [x] Warm-up gate: nothing until the warm-up is done or the person is already warm
+- [x] Animation where one exists (elephant walk, single-leg RDL, good morning, toe touch, leg
+      swings and walking lunges), the text instruction always
+- [x] Hold timer, rep counter, side selector, intensity scale (with a warning above 7), notes
+- [x] Progress saved after each movement; a reload resumes at the next one
+- [x] **Pain rule:** mild tension expected; sharp, radiating or worsening pain stops the session,
+      is recorded as pain, and points to a physiotherapist (D80)
+- [x] Pre-existing severe injuries route to professional guidance instead of the programme (D83)
+- [x] A finished session completes the day's mobility commitment on Today
+
+### Acceptance, end to end in a browser
+
+- [x] **Schedule three sessions** — three days chosen, three sessions offered
+- [x] **Complete them in any order** — session 3 done before 1 and 2
+- [x] **Miss one without breaking the programme** — a skip with a reason, and a stop for pain
+      that stays open to retry; the programme carries on into week 2
+- [x] **View animation and text instructions** — both, with the instructional-aid label
+- [x] **Compare weekly self-reports** — baseline against week 1, "further" and "looser"
+- [x] **Provenance points to the source PDF**
+
+### Rights
+
+- [x] The programme carries `rights_status = 'pending'` and is offered in demo mode only;
+      live mode shows an honest empty state (D78). Clearing it is one database update.
+
+### Verification
+
+- [x] `npm test` — **1001** unit, component and database tests
+- [x] `npm run e2e` — **136** end-to-end tests (9 skipped by design, D76), two consecutive
+      clean full runs against a freshly started server
+- [x] Format, lint, typecheck and build all clean
+- [x] Screenshots inspected at 390×844 and 1440×900 — the introduction, the baseline, the
+      week, the warm-up gate, a movement with its animation, and the comparison table
+
+### Not done, and why
+
+- [ ] **Release outside demo mode** — waits on the rights decision (§7 of the ledger).
+- [ ] **Hip, posture and shoulder programmes** — same source, same rights question.
+- [ ] **Photo storage** — deliberately not built; no private storage exists yet.
+- [ ] **Animations for the remaining ten movements** — text instruction only for now.
+- [ ] **Migrations applied to a hosted database** — still no Supabase project.
+
+## Stages 10–17 — not started
+
+Tracked in `docs/PROJECT_LEDGER.md` §8. No item below stage 10 may be ticked before the
 stage that builds it has run and been verified.

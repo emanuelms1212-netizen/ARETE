@@ -3,8 +3,8 @@
 The running record of what ARETE is, what has been decided, and what happens next.
 Updated at the end of every stage.
 
-**Last updated:** 2026-10-12
-**Stage:** 8 of 17 — Train: the plan engine, workout logging and the animated mannequin
+**Last updated:** 2026-10-19
+**Stage:** 9 of 17 — Flexibility: the four-week hamstring programme
 **Branch:** `build/prompt-pack-v1`
 **Repository:** `emanuelms1212-netizen/ARETE`
 
@@ -29,7 +29,7 @@ at the end of every stage.
 | Styling                           | Tailwind CSS v4 over design tokens                                             | 4.3.3                  |
 | Faces                             | Fraunces Variable (display), Inter Variable (UI), self-hosted                  | 5.3.0                  |
 | Validation                        | Zod                                                                            | 4.5.4                  |
-| Database                          | Postgres. Schema in `supabase/migrations`, 49 tables, RLS on all of them       | —                      |
+| Database                          | Postgres. Schema in `supabase/migrations`, 51 tables, RLS on all of them       | —                      |
 | Driver                            | `pg`, pooled, request-scoped JWT claim per transaction                         | 8.17.0                 |
 | Auth                              | Supabase Auth, **authentication only**                                         | `@supabase/ssr` 0.12.7 |
 | Test database                     | PGlite — Postgres 18 in-process, no server, no credentials                     | 0.5.8                  |
@@ -44,7 +44,8 @@ at the end of every stage.
 app  →  components  →  domain      (types, local days, recurrence, units, idempotency,
    ↘                                   onboarding schemas, safety rules, plan generator,
    ↘                                   workout plan engine, progression, mannequin kinematics)
-   ↘  content                       (exercise library, animation keyframes, practices)
+   ↘  content                       (exercise library, animation keyframes, practices,
+                                     flexibility programmes)
    ↘  design                        (tokens + contrast maths)
    ↘  auth          → integrations/supabase   (sessions only)
    ↘  persistence   → repository interface
@@ -136,11 +137,22 @@ suite — and the SQL one passes it _through_ row-level security, as the `authen
 | **D74** | **Finishing a workout completes the day's training commitment**                     | It is the same fact, and the person should not have to record it twice                                                                                                                                                                                                                                                                                                | Yes         |
 | **D75** | **A trigger checks that a logged set's workout belongs to the same person**         | RLS checks the row's own `user_id`; a foreign key is checked with the owner's rights, not the caller's. Without the trigger, a set could be attached to someone else's workout id. An adversarial test proves the refusal                                                                                                                                             | No          |
 | **D76** | **The workout journey runs in the phone end-to-end project only**                   | The demo is one shared in-memory account with one running workout at a time. Two projects driving it at once would be testing the race, not the feature. Everything read-only runs in both                                                                                                                                                                            | Yes         |
+| **D77** | **The hamstring programme ships as a sourced template, its rights still pending**   | The brief asks for the source's structure; SOURCE_MAP §7 says the structure needs permission. Both hold: the sessions follow the source exactly (a test pins them to SOURCE_MAP's table), every instruction is ARETE's own summary, and `rights_status` stays `pending` — see D78                                                                                     | Yes         |
+| **D78** | **A programme with pending rights is offered in demo mode only**                    | `listFlexPrograms` and `enrolFlex` take `includeRightsPending`, and the page passes `isDemoMode`. Live mode shows an honest empty state until the product owner clears the row — one `update`, no deploy, because rights are read from the database and a re-seed never overwrites them                                                                               | Yes         |
+| **D79** | **Flexibility progress moves by completion, never by the calendar**                 | The current week is the first with an open session; its sessions may be done in any order; a missed day only changes the date the next one is suggested for. This is the source's own rule ("simply continue on the following day") and the only honest one for a real week                                                                                           | No          |
+| **D80** | **A stop for pain does not close the session; a skip does**                         | A skip is a decision with a reason and moves the programme on. A stop is pain: the slot stays open, the next attempt starts every movement in its easier version, and the screen points to a physiotherapist. The schema refuses a stop with no pain recorded                                                                                                         | No          |
+| **D81** | **The warm-up is a gate, with a no-impact route and an "already warm" route**       | The movements do not appear until the warm-up is ticked off. Jogging and high knees can be swapped for a march; straight after a workout the person can say they are warm, which the source itself suggests                                                                                                                                                           | Yes         |
+| **D82** | **Self-reports are compared measure by measure, in words, with no total**           | Forward-fold reach, leg-raise range each side, tightness and two everyday tasks. Each line says "further", "looser", "the same" — never "better", never a score. Photos are not collected: the form says they stay on the person's phone, because there is no private storage yet and an AI must not score them                                                       | Yes         |
+| **D83** | **A severe flag routes to a professional instead of to the programme**              | Onboarding injuries and Train pain flags are both read. Severe on a region the programme loads: no enrolment, no start (refused on the server too), and a plain sentence about seeing a physiotherapist. Mild or moderate: every movement starts in its easier version                                                                                                | No          |
+| **D84** | **A flexibility step moves on only when the server has the record**                 | Moving to the next side locally, before the save returned, let sets be counted on a step that was about to be replaced. Found by the end-to-end journey, not by a unit test                                                                                                                                                                                           | No          |
 
 ## 3. Data model
 
-49 tables. The full account is in **`docs/DATA_MODEL.md`**; the schema itself is
-`supabase/migrations/0001` through `0014`. Stage 8 added `workout_sessions` (a workout as
+51 tables. The full account is in **`docs/DATA_MODEL.md`**; the schema itself is
+`supabase/migrations/0001` through `0015`. Stage 9 added `flexibility_enrolments` (three
+chosen days, one active per programme) and `flexibility_checkins` (the weekly self-report),
+and gave `flexibility_sessions` a status, the warm-up chosen, per-movement items, notes and
+skip reasons. Stage 8 added `workout_sessions` (a workout as
 performed, with the prescription it started from), set-level columns on `workout_logs`
 (session, slug, block, distance, pain, form, notes, substitution), the exercise library's
 instruction text on `exercises`, and the plan inputs on `training_profile`. Stage 7 added `mind_practices` (the catalogue,
@@ -156,7 +168,7 @@ Five conventions run through all of it: ownership by `user_id` with RLS; local d
 zone stored beside the date; template / instance / log as separate tables; one unit system in
 storage; and `client_token` on every write a retry might repeat.
 
-**Migrations:** 14, applying from zero, proven in `src/persistence/rls.test.ts`.
+**Migrations:** 15, applying from zero, proven in `src/persistence/rls.test.ts`.
 **Applied once, and proven:** `public.schema_migrations` records every applied file with a
 checksum (D39). A test asserts that a second `db:migrate` applies nothing, and that an
 already-applied file which has since been edited fails loudly rather than diverging quietly.
@@ -184,9 +196,9 @@ already-applied file which has since been edited fails loudly rather than diverg
 | Gate                         | Command                                                  | In CI           |
 | ---------------------------- | -------------------------------------------------------- | --------------- |
 | Format · Lint · Types        | `format:check` · `lint` · `typecheck`                    | Yes             |
-| Unit, component and database | `npm test` — **926 tests**                               | Yes             |
+| Unit, component and database | `npm test` — **1001 tests**                              | Yes             |
 | Build                        | `npm run build`                                          | Yes             |
-| End-to-end                   | `npm run e2e` — **122 tests** (4 skipped by design, D76) | Yes             |
+| End-to-end                   | `npm run e2e` — **136 tests** (9 skipped by design, D76) | Yes             |
 | Everything                   | `npm run verify`                                         | —               |
 | Migrate / seed / reset       | `db:migrate` · `db:seed` · `db:reset`                    | No — deployment |
 
@@ -221,24 +233,29 @@ already-applied file which has since been edited fails loudly rather than diverg
     say so. Front views exist for the squat and the split squat. Runs are prescribed by time,
     not distance. Loads are shown in kilograms only. Deloads are reactive (D67), not planned
     weeks. The week is the same every week until the setup or the history changes it.
-14. **Playwright cannot run on the build machine**: no browser, and the network allowlist
+14. **Flexibility: what is not there yet.** One programme (hamstrings). The source also has hip,
+    posture and shoulder programmes; they wait on the same rights decision (D77). Photos for the
+    check-in are not stored (D82). Hold timers are local to the page, so a reload mid-hold
+    restarts that hold. Four of the fifteen main movements are
+    animated (plus two warm-up movers); the rest are text.
+15. **Playwright cannot run on the build machine**: no browser, and the network allowlist
     blocks `cdn.playwright.dev`. The suite runs in CI with Playwright's own Chromium, and is
     run here against a production build by setting `PLAYWRIGHT_CHROMIUM_PATH` to a
     preinstalled one. There is no uncommitted local patch.
 
 ## 7. Open risks
 
-| Risk                                                       | Severity | Owner                          | Note                                                                                                                                                                                                                                                                       |
-| ---------------------------------------------------------- | -------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Rights to ship the `Total Flexibility` programme structure | **High** | Product owner                  | Third-party commercial ebook. Now enforced in data: `flexibility_programs.rights_status = 'pending'`, and the seed ships it that way. Either obtain written permission from David Thurin or re-derive the progression                                                      |
-| Contrast-therapy safety                                    | **High** | Product + a qualified reviewer | 70–82 °C sauna, 13 °C immersion, no screening in the source. The pack is flagged `requires_safety_acknowledgement`, and `safety_acknowledgements` gates it                                                                                                                 |
-| Seed-oil content is contested and copyrighted              | Medium   | Product owner                  | Seeded as `third-party-no-redistribution`. At most one optional labelled note                                                                                                                                                                                              |
-| Exercise animations were drawn by an engineer              | Medium   | A coach or physiotherapist     | Nine original keyframe animations, held to kinematic and form checks in tests. They are labelled instructional aids, not form assessment; a qualified reviewer should still look at each before launch                                                                     |
-| No infrastructure                                          | Medium   | Engineering                    | §8                                                                                                                                                                                                                                                                         |
-| **The safety rules have not been reviewed by a clinician** | **High** | Product + a qualified reviewer | The rules in `src/domain/safety.ts` are conservative and tested, but they were written by an engineer reading source PDFs. Pregnancy, cardiovascular and injury gating is exactly the kind of judgement that needs a professional to sign it off before real users meet it |
-| Screen-reader testing has not been done                    | Medium   | Engineering                    | Stage 13                                                                                                                                                                                                                                                                   |
-| No backup or restore procedure                             | Medium   | Engineering                    | Needed before any real user data exists                                                                                                                                                                                                                                    |
-| Unattributed quotes in a source PDF                        | Low      | Content                        | The schema now refuses to attribute anything unverified                                                                                                                                                                                                                    |
+| Risk                                                       | Severity | Owner                          | Note                                                                                                                                                                                                                                                                                                                            |
+| ---------------------------------------------------------- | -------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rights to ship the `Total Flexibility` programme structure | **High** | Product owner                  | Third-party commercial ebook. Built as a sourced template and **offered in demo mode only** (D77, D78). To release it: obtain written permission from David Thurin, then `update public.flexibility_programs set rights_status = 'cleared' where slug = 'hamstring-mobility' and user_id is null`. Or re-derive the progression |
+| Contrast-therapy safety                                    | **High** | Product + a qualified reviewer | 70–82 °C sauna, 13 °C immersion, no screening in the source. The pack is flagged `requires_safety_acknowledgement`, and `safety_acknowledgements` gates it                                                                                                                                                                      |
+| Seed-oil content is contested and copyrighted              | Medium   | Product owner                  | Seeded as `third-party-no-redistribution`. At most one optional labelled note                                                                                                                                                                                                                                                   |
+| Exercise animations were drawn by an engineer              | Medium   | A coach or physiotherapist     | Nine original keyframe animations, held to kinematic and form checks in tests. They are labelled instructional aids, not form assessment; a qualified reviewer should still look at each before launch                                                                                                                          |
+| No infrastructure                                          | Medium   | Engineering                    | §8                                                                                                                                                                                                                                                                                                                              |
+| **The safety rules have not been reviewed by a clinician** | **High** | Product + a qualified reviewer | The rules in `src/domain/safety.ts` are conservative and tested, but they were written by an engineer reading source PDFs. Pregnancy, cardiovascular and injury gating is exactly the kind of judgement that needs a professional to sign it off before real users meet it                                                      |
+| Screen-reader testing has not been done                    | Medium   | Engineering                    | Stage 13                                                                                                                                                                                                                                                                                                                        |
+| No backup or restore procedure                             | Medium   | Engineering                    | Needed before any real user data exists                                                                                                                                                                                                                                                                                         |
+| Unattributed quotes in a source PDF                        | Low      | Content                        | The schema now refuses to attribute anything unverified                                                                                                                                                                                                                                                                         |
 
 ## 8. Exact next step
 
@@ -268,17 +285,26 @@ The safety rules need a clinical reviewer before real users meet them (§7). The
 written, conservative and tested; what is missing is a professional saying so. This is not
 blocking stage 6, but it blocks launch.
 
-### Then: stage 9 — flexibility and mobility
+### Also waiting on the product owner: the flexibility rights
 
-Re-read prompt 9 in the pack before starting; in outline it is the flexibility and mobility
-programmes with pain-aware adaptation. Two things carry over from stage 8: the mannequin
-framework (D71–D73) is ready for mobility movements — a new animation is keyframes plus the
-checks that prove it — and the `Total Flexibility` rights question (§7) decides whether the
-programme structure can ship or must be re-derived.
+The hamstring programme is built and works end to end, but it is offered only in demo mode
+until its rights are cleared (D78, §7). It is one database update once permission exists.
+
+### Then: stage 10 — nutrition and calorie tracking
+
+Prompt 10 in the pack, in outline: manual-first food logging with energy and macro targets
+that are transparent ranges (never punishment budgets), user overrides, metric/US units, meals,
+custom foods and recipes, favourites, copy-previous and quick add; protein, carbohydrate,
+fat, fibre and hydration; an optional, hideable body-weight trend on rolling averages. No
+invented nutrition values — demo foods visibly synthetic or properly sourced. Safeguards for
+under-18s (already blocked in `safety.ts`), pregnancy and postpartum, eating-disorder risk and
+prescribed diets, and a way to hide every number. The seed-oil guide becomes an optional,
+off-by-default "ingredient/oil awareness" preference — labelled as one author's viewpoint,
+no supplement advice — deletable with all its data.
 
 Still open from earlier stages, in the order they will bite: the Supabase project (above), the
 four unimplemented cognitive drills (D61), tasks having no edit screen, habit schedules not yet
-being expanded per day, and the Train items in §6.13.
+being expanded per day, and the Train and Flexibility items in §6.
 
 ## 9. Working rules learned the hard way
 
@@ -309,3 +335,7 @@ being expanded per day, and the Train items in §6.13.
   validator on the first run; the screenshots still showed what to check next. A figure can be
   geometrically valid and teach the wrong thing, which is why each animation also has tests
   for what the movement is meant to look like.
+- **Let the end-to-end journey drive the real timers.** The flexibility test runs a fake
+  clock through every 30-second hold rather than skipping them. That is what found D84: a step
+  that moved on before its save returned, invisible to every unit test and to a human clicking
+  at human speed.

@@ -539,6 +539,53 @@ export const ELEPHANT_WALK: ExerciseAnimation = {
   contacts: ['nearToe', 'farToe', 'nearHand', 'farHand'],
 };
 
+// ---------------------------------------------------------------------------
+// Toe touch: a standing forward fold, held
+// ---------------------------------------------------------------------------
+
+function toeTouchPose(pelvis: Vec, trunk: number, neck: number): Pose {
+  return {
+    pelvis,
+    trunk,
+    neck,
+    // Arms hang straight down from the shoulders, so they follow the trunk.
+    nearArm: { shoulder: trunk, elbow: 5 },
+    farArm: { shoulder: trunk, elbow: 5 },
+    pins: { nearLeg: STANDING_TOE, farLeg: STANDING_TOE },
+    feet: { near: 0, far: 0 },
+  };
+}
+
+const toeTouchStand = toeTouchPose({ x: -0.5, y: 92.9 }, 2, 0);
+const toeTouchFold = toeTouchPose({ x: -9, y: 91.5 }, 112, 25);
+
+export const TOE_TOUCH: ExerciseAnimation = {
+  slug: 'toe-touch',
+  title: 'Toe touch',
+  views: ['side'],
+  durationMs: 6000,
+  loop: { from: 0, to: 1 },
+  pinned: { nearLeg: 1, farLeg: 1 },
+  keyframes: [
+    { at: 0, pose: toeTouchStand },
+    { at: 0.3, pose: toeTouchFold, ease: 'inOut' },
+    { at: 0.75, pose: toeTouchFold, ease: 'linear' },
+    { at: 1, pose: toeTouchStand, ease: 'inOut' },
+  ],
+  cues: [
+    { from: 0, to: 0.3, text: 'Hinge from the hips; the hands slide down the legs.' },
+    { from: 0.3, to: 0.55, text: 'Stop where it is comfortable. Soft knees are fine.' },
+    { from: 0.55, to: 0.75, text: 'Hold and breathe slowly. Mild tension only.' },
+    { from: 0.75, to: 1, text: 'Come up slowly, the head arriving last.' },
+  ],
+  highlight: {
+    joints: ['pelvis'],
+    segments: ['nearThigh'],
+    label: 'The backs of the thighs, lengthening.',
+  },
+  contacts: ['nearHeel', 'nearToe', 'farHeel', 'farToe'],
+};
+
 export const ANIMATIONS: readonly ExerciseAnimation[] = [
   SQUAT,
   PUSH_UP,
@@ -549,6 +596,7 @@ export const ANIMATIONS: readonly ExerciseAnimation[] = [
   GOOD_MORNING,
   LEG_SWING,
   ELEPHANT_WALK,
+  TOE_TOUCH,
 ];
 
 export function animationFor(slug: string | null | undefined): ExerciseAnimation | null {

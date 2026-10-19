@@ -39,22 +39,23 @@ duplicate. A focus session recorded three times is one row.
 
 ## 2. The tables
 
-| Migration             | Tables                                                                                                                                                         |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `0001_foundation`     | Helper functions: `set_updated_at`, `attach_updated_at`, `current_user_id`                                                                                     |
-| `0002_identity`       | `profiles`, `preferences`, `onboarding_answers`, `notification_preferences`, `safety_acknowledgements`                                                         |
-| `0003_planning`       | `goals`, `milestones`, `projects`, `tasks`, `task_occurrences`, `habits`, `habit_schedules`, `habit_logs`, `daily_plans`, `daily_plan_items`                   |
-| `0004_sessions`       | `focus_sessions`, `meditation_sessions`, `breathwork_sessions`, `cognitive_sessions`                                                                           |
-| `0005_training`       | `exercises`, `exercise_animation_assets`, `workout_plans`, `workout_days`, `workout_exercises`, `workout_logs`, `flexibility_programs`, `flexibility_sessions` |
-| `0006_nutrition_body` | `nutrition_targets`, `foods`, `meals`, `food_entries`, `body_metrics`                                                                                          |
-| `0007_content`        | `content_sources`, `content_packs`, `quotes`, `journal_entries`                                                                                                |
-| `0008_analytics`      | `analytics_events`                                                                                                                                             |
-| `0009_rls`            | Policies and grants for all of the above                                                                                                                       |
-| `0010_export_delete`  | `export_my_data()`, `delete_my_account()`                                                                                                                      |
-| `0011_onboarding`     | `onboarding_progress`, `health_profile`, `training_profile`, `nutrition_profile`, `mind_profile`, `plan_drafts`                                                |
-| `0012_daily_system`   | `goal_measurements`, `goal_reviews`, `day_reviews`; habit kinds, task subtasks, the day's framing, the focus timer's pause state                               |
-| `0013_mind`           | `mind_practices`, `user_content_packs`; the shared player columns on the three Mind session tables                                                             |
-| `0014_train`          | `workout_sessions`; set-level columns on `workout_logs`; instruction text on `exercises`; plan inputs on `training_profile`                                    |
+| Migration             | Tables                                                                                                                                                                  |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0001_foundation`     | Helper functions: `set_updated_at`, `attach_updated_at`, `current_user_id`                                                                                              |
+| `0002_identity`       | `profiles`, `preferences`, `onboarding_answers`, `notification_preferences`, `safety_acknowledgements`                                                                  |
+| `0003_planning`       | `goals`, `milestones`, `projects`, `tasks`, `task_occurrences`, `habits`, `habit_schedules`, `habit_logs`, `daily_plans`, `daily_plan_items`                            |
+| `0004_sessions`       | `focus_sessions`, `meditation_sessions`, `breathwork_sessions`, `cognitive_sessions`                                                                                    |
+| `0005_training`       | `exercises`, `exercise_animation_assets`, `workout_plans`, `workout_days`, `workout_exercises`, `workout_logs`, `flexibility_programs`, `flexibility_sessions`          |
+| `0006_nutrition_body` | `nutrition_targets`, `foods`, `meals`, `food_entries`, `body_metrics`                                                                                                   |
+| `0007_content`        | `content_sources`, `content_packs`, `quotes`, `journal_entries`                                                                                                         |
+| `0008_analytics`      | `analytics_events`                                                                                                                                                      |
+| `0009_rls`            | Policies and grants for all of the above                                                                                                                                |
+| `0010_export_delete`  | `export_my_data()`, `delete_my_account()`                                                                                                                               |
+| `0011_onboarding`     | `onboarding_progress`, `health_profile`, `training_profile`, `nutrition_profile`, `mind_profile`, `plan_drafts`                                                         |
+| `0012_daily_system`   | `goal_measurements`, `goal_reviews`, `day_reviews`; habit kinds, task subtasks, the day's framing, the focus timer's pause state                                        |
+| `0013_mind`           | `mind_practices`, `user_content_packs`; the shared player columns on the three Mind session tables                                                                      |
+| `0014_train`          | `workout_sessions`; set-level columns on `workout_logs`; instruction text on `exercises`; plan inputs on `training_profile`                                             |
+| `0015_flexibility`    | `flexibility_enrolments`, `flexibility_checkins`; status, warm-up, items, notes and skip reason on `flexibility_sessions`; library slug index on `flexibility_programs` |
 
 `daily_plan_items` is the one table not in the brief's list. A `daily_plans` row on its own
 cannot represent a day; this is the commitment the Today screen renders.
@@ -100,22 +101,26 @@ contract suite, and the SQL one through row-level security.
 
 Some rules are too important to leave to application code that a later feature might forget.
 
-| Rule                                      | How                                                                                                                                                                                            |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| No free text in analytics                 | `check (not payload_has_free_text(payload))` — a payload with a key matching `note/text/title/description/entry/answer/reflection/journal/body/prompt/name/email/comment` is rejected outright |
-| Never invent an attribution               | `check (author is null or attribution_status = 'verified-public-domain')` — a paraphrase or common saying may not carry an author                                                              |
-| A skip has a reason                       | `check (status <> 'skipped' or skip_reason is not null)` — that is what makes a skip not a failure                                                                                             |
-| A movement is counted in reps **or** time | `check (num_nonnulls(reps, hold_seconds) = 1)`                                                                                                                                                 |
-| Cognitive drills report practice only     | No column is a cognitive score; the table comment says so                                                                                                                                      |
-| One running workout per person            | Partial unique index `workout_sessions_one_running`                                                                                                                                            |
-| A finished workout has an end time        | `check ((status = 'running') = (ended_at is null))`                                                                                                                                            |
-| One row per logged set                    | Unique `(workout_session_id, exercise_slug, set_index)`; logging a set again updates it                                                                                                        |
-| A set belongs to its owner's workout      | Trigger `guard_workout_log_owner` — RLS checks the row's `user_id`, a foreign key is checked with the owner's rights, so the trigger closes the gap                                            |
-| Pain is 0–10                              | `check (pain between 0 and 10)` on `workout_logs`                                                                                                                                              |
-| Two to six training days                  | `check (cardinality(training_weekdays) = 0 or cardinality(training_weekdays) between 2 and 6)`                                                                                                 |
-| Library exercise slugs are unique         | Partial unique index on `exercises (slug) where user_id is null` — `unique (user_id, slug)` alone lets nulls repeat                                                                            |
-| A loadable exercise has a load step       | `check (not loadable or increment_kg > 0)`                                                                                                                                                     |
-| Flexibility rights are unresolved         | `flexibility_programs.rights_status` defaults to `pending`, and the seed ships the hamstring programme as `pending`                                                                            |
+| Rule                                                     | How                                                                                                                                                                                            |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No free text in analytics                                | `check (not payload_has_free_text(payload))` — a payload with a key matching `note/text/title/description/entry/answer/reflection/journal/body/prompt/name/email/comment` is rejected outright |
+| Never invent an attribution                              | `check (author is null or attribution_status = 'verified-public-domain')` — a paraphrase or common saying may not carry an author                                                              |
+| A skip has a reason                                      | `check (status <> 'skipped' or skip_reason is not null)` — that is what makes a skip not a failure                                                                                             |
+| A movement is counted in reps **or** time                | `check (num_nonnulls(reps, hold_seconds) = 1)`                                                                                                                                                 |
+| Cognitive drills report practice only                    | No column is a cognitive score; the table comment says so                                                                                                                                      |
+| One running workout per person                           | Partial unique index `workout_sessions_one_running`                                                                                                                                            |
+| A finished workout has an end time                       | `check ((status = 'running') = (ended_at is null))`                                                                                                                                            |
+| One row per logged set                                   | Unique `(workout_session_id, exercise_slug, set_index)`; logging a set again updates it                                                                                                        |
+| A set belongs to its owner's workout                     | Trigger `guard_workout_log_owner` — RLS checks the row's `user_id`, a foreign key is checked with the owner's rights, so the trigger closes the gap                                            |
+| Pain is 0–10                                             | `check (pain between 0 and 10)` on `workout_logs`                                                                                                                                              |
+| Two to six training days                                 | `check (cardinality(training_weekdays) = 0 or cardinality(training_weekdays) between 2 and 6)`                                                                                                 |
+| Library exercise slugs are unique                        | Partial unique index on `exercises (slug) where user_id is null` — `unique (user_id, slug)` alone lets nulls repeat                                                                            |
+| A loadable exercise has a load step                      | `check (not loadable or increment_kg > 0)`                                                                                                                                                     |
+| Three flexibility days, one active run                   | `check (cardinality(schedule_weekdays) = 3)`; partial unique index on active enrolments per programme                                                                                          |
+| A flexibility stop is pain; a skip has why               | `check (status <> 'stopped' or pain_reported)`, `check (status <> 'skipped' or skip_reason is not null)`                                                                                       |
+| A flexibility session closes once                        | Partial unique index on `(enrolment_id, week, day)` where completed or skipped; stopped attempts may repeat                                                                                    |
+| Sessions and check-ins belong to their owner's enrolment | Trigger `guard_flexibility_enrolment_owner`, for the same reason as the workout-set trigger                                                                                                    |
+| Flexibility rights are unresolved                        | `flexibility_programs.rights_status` defaults to `pending`, and the seed ships the hamstring programme as `pending`                                                                            |
 
 ## 5. Export and deletion
 
@@ -184,8 +189,8 @@ repository. The seed is idempotent: running it twice changes nothing, and a test
 - **No Supabase project exists yet.** Everything here is proven against an in-process
   Postgres; the migrations have not been applied to a hosted database. See
   `PROJECT_LEDGER.md` §8 for exactly what that needs.
-- **Repositories exist for days, onboarding, goals, tasks, habits, focus, Mind and Train.**
-  Nutrition, body metrics, flexibility and the journal have schema, policies and tests; their
+- **Repositories exist for days, onboarding, goals, tasks, habits, focus, Mind, Train and
+  Flexibility.** Nutrition, body metrics and the journal have schema, policies and tests; their
   repositories arrive with the modules that use them. An interface written before its screen
   is an interface written twice.
 - **The training plan is not a table.** It is computed from `training_profile` and the logged

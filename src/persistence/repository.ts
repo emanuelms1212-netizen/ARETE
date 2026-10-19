@@ -19,7 +19,21 @@ import type {
   OnboardingStep,
   Recurrence,
 } from '@/domain';
-import type { Block, DrillItem, TrainingSetup, WorkoutSession, WorkoutSnapshot } from '@/domain';
+import type {
+  Block,
+  Checkin,
+  DrillItem,
+  FlexEnrolment,
+  FlexItemRecord,
+  FlexProgram,
+  FlexSessionRecord,
+  RightsStatus,
+  StoredCheckin,
+  TrainingSetup,
+  WarmupChoice,
+  WorkoutSession,
+  WorkoutSnapshot,
+} from '@/domain';
 
 /**
  * The persistence contract.
@@ -612,6 +626,106 @@ export interface TrainRepository {
   getWorkout(userId: string, workoutId: string): Promise<WorkoutSession | null>;
 }
 
+// ---------------------------------------------------------------------------
+// Flexibility programmes
+// ---------------------------------------------------------------------------
+
+export interface FlexProgramListing {
+  readonly program: FlexProgram;
+  /** From the database where there is one: the product owner clears it there. */
+  readonly rightsStatus: RightsStatus;
+}
+
+export interface FlexibilityRepository {
+  /**
+   * Programmes this account may be offered. A programme whose rights are not
+   * cleared is excluded unless the caller allows it — the enforcement point
+   * for SOURCE_MAP §7, in the same spirit as the opt-in pack rule (D55).
+   */
+  listFlexPrograms(
+    userId: string,
+    options: { readonly includeRightsPending: boolean },
+  ): Promise<readonly FlexProgramListing[]>;
+  getActiveEnrolment(userId: string, programSlug: string): Promise<FlexEnrolment | null>;
+  /** Starts a programme. Any active enrolment in the same programme is ended first. */
+  enrolFlex(
+    userId: string,
+    input: {
+      readonly programSlug: string;
+      readonly startedOn: IsoDate;
+      readonly weekdays: readonly number[];
+      readonly at: Date;
+      readonly includeRightsPending: boolean;
+    },
+  ): Promise<FlexEnrolment>;
+  setFlexSchedule(
+    userId: string,
+    enrolmentId: string,
+    weekdays: readonly number[],
+  ): Promise<FlexEnrolment>;
+  endFlexEnrolment(
+    userId: string,
+    enrolmentId: string,
+    status: 'completed' | 'ended',
+    at: Date,
+  ): Promise<FlexEnrolment>;
+
+  listFlexSessions(userId: string, enrolmentId: string): Promise<readonly FlexSessionRecord[]>;
+  getRunningFlexSession(userId: string): Promise<FlexSessionRecord | null>;
+  /** Refuses a slot that does not exist or is already closed, and a second running session. */
+  startFlexSession(
+    userId: string,
+    input: {
+      readonly enrolmentId: string;
+      readonly week: number;
+      readonly day: number;
+      readonly localDate: IsoDate;
+      readonly timeZone: string;
+      readonly startedAt: Date;
+      readonly clientToken: string;
+    },
+  ): Promise<FlexSessionRecord>;
+  updateFlexSession(
+    userId: string,
+    sessionId: string,
+    patch: {
+      readonly warmup?: WarmupChoice;
+      readonly items?: readonly FlexItemRecord[];
+      readonly notes?: string | null;
+    },
+  ): Promise<FlexSessionRecord>;
+  /** `stopped` is the pain exit, and is always recorded as pain. */
+  finishFlexSession(
+    userId: string,
+    input: {
+      readonly sessionId: string;
+      readonly status: 'completed' | 'stopped';
+      readonly at: Date;
+      readonly painNote?: string | null;
+      readonly notes?: string | null;
+    },
+  ): Promise<FlexSessionRecord>;
+  skipFlexSession(
+    userId: string,
+    input: {
+      readonly enrolmentId: string;
+      readonly week: number;
+      readonly day: number;
+      readonly localDate: IsoDate;
+      readonly timeZone: string;
+      readonly reason: string;
+      readonly at: Date;
+    },
+  ): Promise<FlexSessionRecord>;
+
+  /** One per week per enrolment; saving again for the same week corrects it. */
+  saveFlexCheckin(
+    userId: string,
+    input: { readonly enrolmentId: string; readonly localDate: IsoDate; readonly checkin: Checkin },
+  ): Promise<StoredCheckin>;
+  listFlexCheckins(userId: string, enrolmentId: string): Promise<readonly StoredCheckin[]>;
+}
+
 export interface AccountRepository {
   /** Everything the account holds, as one document. Immediate, no queue. */
   exportEverything(userId: string): Promise<AccountExport>;
@@ -629,6 +743,7 @@ export interface AreteRepository
     HabitRepository,
     MindRepository,
     TrainRepository,
+    FlexibilityRepository,
     FocusSessionRepository,
     AccountRepository {
   readonly kind: 'memory' | 'sql';

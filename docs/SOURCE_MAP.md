@@ -212,6 +212,10 @@ contact → supplement promotion ("Flexy Joints") with a discount code → **dis
 | **Photographs and illustrations**                                       | Third-party copyright — **never reproduced.** ARETE draws its own vector/SVG animations |
 | **Author name, branding, "Flexy Joints" promotion, discount code**      | Not shipped                                                                             |
 
+**Stage 9 (2026-10-19):** built as a sourced template — the structure above, exactly, with
+ARETE-written instructions — and **offered in demo mode only** while `rights_status` is
+`pending` (ledger D77, D78). Clearing it is one database update.
+
 **Open action for the user:** decide whether to (a) obtain written permission from David Thurin
 to ship the program structure with attribution, or (b) have ARETE generate its own progression
 from the movement vocabulary. Until that is decided, the flexibility module ships **structure-only,

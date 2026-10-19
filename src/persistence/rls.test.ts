@@ -426,3 +426,75 @@ describe('workouts', () => {
     ).rejects.toThrow(/exercises_library_slug/);
   });
 });
+
+describe('flexibility', () => {
+  let theirEnrolment: string;
+
+  beforeAll(async () => {
+    await database.asOwner();
+    const program = await database.db.query<{ id: string }>(
+      `insert into public.flexibility_programs (user_id, slug, name, region, weeks, days_per_week)
+       values (null, 'rls-flex', 'RLS flex', 'hamstrings', 4, 3)
+       on conflict (slug) where user_id is null do update set name = excluded.name
+       returning id`,
+    );
+    const enrolment = await database.db.query<{ id: string }>(
+      `insert into public.flexibility_enrolments
+         (user_id, flexibility_program_id, program_slug, started_on, schedule_weekdays)
+       values ($1, $2, 'rls-flex', '2026-03-02', '{1,3,5}') returning id`,
+      [USER_B, program.rows[0]!.id],
+    );
+    theirEnrolment = enrolment.rows[0]!.id;
+  });
+
+  it("cannot see another person's enrolment", async () => {
+    await database.asUser(USER_A);
+    expect(
+      await rows(`select * from public.flexibility_enrolments where id = $1`, [theirEnrolment]),
+    ).toEqual([]);
+  });
+
+  it("cannot attach a session or a check-in to another person's enrolment", async () => {
+    await database.asUser(USER_A);
+    await expect(
+      database.db.query(
+        `insert into public.flexibility_sessions (user_id, enrolment_id, week, day, local_date, timezone, status)
+         values ($1, $2, 1, 1, '2026-03-02', 'UTC', 'running')`,
+        [USER_A, theirEnrolment],
+      ),
+    ).rejects.toThrow(/does not belong to this user/);
+    await expect(
+      database.db.query(
+        `insert into public.flexibility_checkins
+           (user_id, enrolment_id, week, local_date, toe_touch, leg_raise_left, leg_raise_right,
+            tightness, socks, pick_up, pain)
+         values ($1, $2, 0, '2026-03-02', 'toes', 'to_70', 'to_70', 5, 'easy', 'easy', 'none')`,
+        [USER_A, theirEnrolment],
+      ),
+    ).rejects.toThrow(/does not belong to this user/);
+  });
+
+  it('refuses a stop without pain, a skip without a reason, and a slot closed twice', async () => {
+    await database.asOwner();
+    const insert = (status: string, extra = '', values = '') =>
+      database.db.query(
+        `insert into public.flexibility_sessions (user_id, enrolment_id, week, day, local_date, timezone, status${extra})
+         values ($1, $2, 2, 1, '2026-03-09', 'UTC', $3${values})`,
+        [USER_B, theirEnrolment, status],
+      );
+    await expect(insert('stopped')).rejects.toThrow(/flexibility_stop_is_pain/);
+    await expect(insert('skipped')).rejects.toThrow(/flexibility_skip_has_reason/);
+    await insert('completed');
+    await expect(insert('completed')).rejects.toThrow(/flexibility_sessions_slot_closed_once/);
+  });
+
+  it('takes exactly three days', async () => {
+    await database.asOwner();
+    await expect(
+      database.db.query(
+        `update public.flexibility_enrolments set schedule_weekdays = '{1,3}' where id = $1`,
+        [theirEnrolment],
+      ),
+    ).rejects.toThrow(/flexibility_three_days/);
+  });
+});

@@ -23,6 +23,7 @@ import {
   PUSH_UP,
   SINGLE_LEG_RDL,
   SQUAT,
+  TOE_TOUCH,
   animationFor,
 } from './animations';
 
@@ -45,9 +46,10 @@ const max = (values: number[]) => Math.max(...values);
 const min = (values: number[]) => Math.min(...values);
 
 describe('every animation', () => {
-  it('includes the nine the build asks for', () => {
+  it('includes the nine the build asks for, and the toe touch for flexibility', () => {
     expect(ANIMATIONS.map((animation) => animation.slug).sort()).toEqual(
       [
+        'toe-touch',
         'elephant-walk',
         'glute-bridge',
         'good-morning',
@@ -367,5 +369,25 @@ describe('elephant walk', () => {
       expect(Math.abs(frame.points.nearHand.y)).toBeLessThan(CONTACT_TOLERANCE);
       expect(Math.abs(frame.points.farHand.y)).toBeLessThan(CONTACT_TOLERANCE);
     }
+  });
+});
+
+describe('toe touch', () => {
+  const frames = sample(TOE_TOUCH);
+  const fold = solvePose(poseAt(TOE_TOUCH, 0.5), TOE_TOUCH.pinned);
+
+  it('folds well forward with the knees only softened', () => {
+    expect(fold.angles.trunk).toBeGreaterThan(100);
+    expect(max(frames.map((frame) => frame.angles.nearKnee))).toBeLessThan(30);
+  });
+
+  it('brings the hands below the knees without reaching the floor through it', () => {
+    expect(fold.points.nearHand.y).toBeLessThan(fold.points.nearKnee.y);
+    expect(fold.points.nearHand.y).toBeGreaterThan(0);
+  });
+
+  it('keeps both feet flat', () => {
+    for (const frame of frames)
+      expect(Math.abs(frame.points.nearHeel.y)).toBeLessThan(CONTACT_TOLERANCE);
   });
 });

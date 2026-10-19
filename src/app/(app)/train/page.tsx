@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { getCurrentUser } from '@/auth';
 import { TrainBoard } from '@/components/train/train-board';
 import { EmptyState, PageHeader } from '@/components/ui';
@@ -61,6 +62,22 @@ export default async function TrainPage() {
         title="Train"
         lede="A plan that fits your week, gets harder only when your sets say so, and always has a smaller version."
       />
+      <nav aria-label="More in Train" className="grid grid-cols-2 gap-3">
+        <Link
+          href="/train/flexibility"
+          className="rounded-xl border border-line bg-surface p-3 hover:border-line-strong"
+        >
+          <span className="block text-body font-semibold text-ink">Flexibility</span>
+          <span className="block text-body-sm text-ink-muted">Hamstrings, four weeks</span>
+        </Link>
+        <Link
+          href="/train/exercises"
+          className="rounded-xl border border-line bg-surface p-3 hover:border-line-strong"
+        >
+          <span className="block text-body font-semibold text-ink">Exercise library</span>
+          <span className="block text-body-sm text-ink-muted">How to do each movement</span>
+        </Link>
+      </nav>
       <TrainBoard
         setup={data.setup}
         suggested={data.suggested}

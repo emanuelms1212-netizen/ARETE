@@ -21,6 +21,7 @@ import {
 } from './repository';
 import { createSqlDailySystem } from './sql/daily-system';
 import { createSqlMind } from './sql/mind';
+import { createSqlFlexibility } from './sql/flexibility';
 import { createSqlTrain } from './sql/train';
 import type { SqlExecutor } from './sql-executor';
 
@@ -137,6 +138,7 @@ export function createSqlRepository(executor: SqlExecutor): AreteRepository {
   // Meditation, breathwork and cognitive practice.
   const mind = createSqlMind(executor);
   const train = createSqlTrain(executor);
+  const flexibility = createSqlFlexibility(executor);
 
   // ---------------------------------------------------------------------
   // Onboarding
@@ -350,6 +352,7 @@ export function createSqlRepository(executor: SqlExecutor): AreteRepository {
     ...daily,
     ...mind,
     ...train,
+    ...flexibility,
 
     async getOnboarding(userId: string) {
       return loadOnboarding(userId);

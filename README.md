@@ -12,7 +12,7 @@ Working title. Renaming is a one-line change in `src/lib/app-config.ts`.
 
 ## Status
 
-**Stage 8 of 17 — Train.** There is a real schema: 49 tables, row-level security on every one of them, and an authorization test suite
+**Stage 9 of 17 — Flexibility.** There is a real schema: 51 tables, row-level security on every one of them, and an authorization test suite
 that runs against a real Postgres and actually tries to read another user's data. The app
 reads the signed-in user's own local day through a repository interface with two
 interchangeable implementations.
@@ -36,6 +36,11 @@ progresses only when the logged sets say so. Workouts are started, logged set by
 effort and pain, swapped within a movement pattern, and finished. Nine exercises have an
 original, data-driven SVG mannequin animation — tested for what the movement should look
 like — and every one of the fifty has a full text instruction.
+
+Flexibility is live in demo mode: a four-week hamstring programme built from the source's
+structure in ARETE's own words, three sessions a week on days the person chooses, done in any
+order, with a warm-up gate, a pain exit that is always on screen, and weekly self-reports
+compared in words. It waits on a content-rights decision before it is offered in live mode.
 
 Progress still renders an honest "not built yet" state naming the stage that builds it.
 

@@ -14,6 +14,7 @@ import {
 import { demoDays, demoSeed, type DemoSeed } from './demo-data';
 import { createMemoryDailySystem } from './memory/daily-system';
 import { createMemoryMind } from './memory/mind';
+import { createMemoryFlexibility } from './memory/flexibility';
 import { createMemoryTrain } from './memory/train';
 import { demoTraining } from './demo-training';
 import {
@@ -124,6 +125,9 @@ export function createMemoryRepository(
   });
   if (planSeed !== null) seedTrain(seedUserId, demoTraining());
 
+  // Flexibility programmes.
+  const { exportFlexibility, deleteFlexibility, ...flexibility } = createMemoryFlexibility();
+
   function onboardingFor(userId: string): OnboardingRecord {
     let record = state.onboarding.get(userId);
     if (!record) {
@@ -176,6 +180,7 @@ export function createMemoryRepository(
     ...daily,
     ...mind,
     ...train,
+    ...flexibility,
 
     async getOnboarding(userId: string) {
       return onboardingState(userId);
@@ -352,7 +357,12 @@ export function createMemoryRepository(
         exportedAt: new Date(0).toISOString(),
         schemaVersion: 10,
         profile: { id: userId, mode: 'demo' },
-        tables: { daily_plans: days, focus_sessions: focus, ...exportTrain(userId) },
+        tables: {
+          daily_plans: days,
+          focus_sessions: focus,
+          ...exportTrain(userId),
+          ...exportFlexibility(userId),
+        },
       };
     },
 
@@ -364,6 +374,7 @@ export function createMemoryRepository(
         if (mapKey.startsWith(`${userId}::`)) state.focus.delete(mapKey);
       }
       deleteTrain(userId);
+      deleteFlexibility(userId);
     },
   };
 }
