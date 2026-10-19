@@ -14,6 +14,7 @@ import {
   type Measurement,
   type Milestone,
   type Recurrence,
+  type Virtue,
 } from '@/domain';
 import {
   InvalidWriteError,
@@ -208,6 +209,28 @@ export interface SqlDayAccess {
   requireDay(userId: string, localDate: IsoDate): Promise<Day>;
   /** Returns the plan row's id, creating the plan if the day has none yet. */
   ensurePlan(userId: string, localDate: IsoDate, timeZone: string): Promise<string>;
+}
+
+interface FramingRow {
+  intention: string | null;
+  in_my_control: string | null;
+  not_my_control: string | null;
+  virtue: Virtue | null;
+  obstacle: string | null;
+  minimum_mode: boolean;
+}
+
+const FRAMING_COLUMNS = 'intention, in_my_control, not_my_control, virtue, obstacle, minimum_mode';
+
+function framingOf(row: FramingRow): DayFraming {
+  return {
+    intention: row.intention,
+    inMyControl: row.in_my_control,
+    notMyControl: row.not_my_control,
+    virtue: row.virtue,
+    obstacle: row.obstacle,
+    minimumMode: row.minimum_mode,
+  };
 }
 
 export function createSqlDailySystem(executor: SqlExecutor, access: SqlDayAccess) {
@@ -965,23 +988,21 @@ export function createSqlDailySystem(executor: SqlExecutor, access: SqlDayAccess
     // The day's framing, edits and review
     // -----------------------------------------------------------------------
     async getFraming(userId: string, localDate: IsoDate): Promise<DayFraming> {
-      const result = await executor.query<{
-        intention: string | null;
-        in_my_control: string | null;
-        not_my_control: string | null;
-        minimum_mode: boolean;
-      }>(
-        `select intention, in_my_control, not_my_control, minimum_mode
-           from public.daily_plans where user_id = $1 and local_date = $2`,
+      const result = await executor.query<FramingRow>(
+        `select ${FRAMING_COLUMNS} from public.daily_plans where user_id = $1 and local_date = $2`,
         [userId, localDate],
       );
       const row = result.rows[0];
-      return {
-        intention: row?.intention ?? null,
-        inMyControl: row?.in_my_control ?? null,
-        notMyControl: row?.not_my_control ?? null,
-        minimumMode: row?.minimum_mode ?? false,
-      };
+      return row
+        ? framingOf(row)
+        : {
+            intention: null,
+            inMyControl: null,
+            notMyControl: null,
+            virtue: null,
+            obstacle: null,
+            minimumMode: false,
+          };
     },
 
     async setFraming(
@@ -992,22 +1013,21 @@ export function createSqlDailySystem(executor: SqlExecutor, access: SqlDayAccess
         intention?: string | null;
         inMyControl?: string | null;
         notMyControl?: string | null;
+        virtue?: Virtue | null;
+        obstacle?: string | null;
       },
     ): Promise<DayFraming> {
       await access.ensurePlan(userId, input.localDate, input.timeZone);
 
-      const result = await executor.query<{
-        intention: string | null;
-        in_my_control: string | null;
-        not_my_control: string | null;
-        minimum_mode: boolean;
-      }>(
+      const result = await executor.query<FramingRow>(
         `update public.daily_plans set
            intention = case when $3 then $4 else intention end,
            in_my_control = case when $5 then $6 else in_my_control end,
-           not_my_control = case when $7 then $8 else not_my_control end
+           not_my_control = case when $7 then $8 else not_my_control end,
+           virtue = case when $9 then $10 else virtue end,
+           obstacle = case when $11 then $12 else obstacle end
          where user_id = $1 and local_date = $2
-         returning intention, in_my_control, not_my_control, minimum_mode`,
+         returning ${FRAMING_COLUMNS}`,
         [
           userId,
           input.localDate,
@@ -1017,17 +1037,15 @@ export function createSqlDailySystem(executor: SqlExecutor, access: SqlDayAccess
           input.inMyControl ?? null,
           'notMyControl' in input,
           input.notMyControl ?? null,
+          'virtue' in input,
+          input.virtue ?? null,
+          'obstacle' in input,
+          input.obstacle ?? null,
         ],
       );
       const row = result.rows[0];
       if (!row) throw new RecordNotFoundError(`No day ${input.localDate} for this account`);
-
-      return {
-        intention: row.intention,
-        inMyControl: row.in_my_control,
-        notMyControl: row.not_my_control,
-        minimumMode: row.minimum_mode,
-      };
+      return framingOf(row);
     },
 
     async setMinimumMode(
@@ -1162,10 +1180,11 @@ export function createSqlDailySystem(executor: SqlExecutor, access: SqlDayAccess
         went_well: string | null;
         friction: string | null;
         tomorrow_one_thing: string | null;
+        learned: string | null;
         energy: DayReview['energy'];
         met_minimum: boolean | null;
       }>(
-        `select local_date::text, went_well, friction, tomorrow_one_thing, energy, met_minimum
+        `select local_date::text, went_well, friction, tomorrow_one_thing, learned, energy, met_minimum
            from public.day_reviews where user_id = $1 and local_date = $2`,
         [userId, localDate],
       );
@@ -1177,6 +1196,7 @@ export function createSqlDailySystem(executor: SqlExecutor, access: SqlDayAccess
         wentWell: row.went_well,
         friction: row.friction,
         tomorrowOneThing: row.tomorrow_one_thing,
+        learned: row.learned,
         energy: row.energy,
         metMinimum: row.met_minimum,
       };
@@ -1189,12 +1209,13 @@ export function createSqlDailySystem(executor: SqlExecutor, access: SqlDayAccess
       await executor.query(
         `insert into public.day_reviews
            (user_id, local_date, timezone, went_well, friction, tomorrow_one_thing,
-            energy, met_minimum)
-         values ($1, $2, $3, $4, $5, $6, $7, $8)
+            energy, met_minimum, learned)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          on conflict (user_id, local_date) do update set
            went_well = excluded.went_well,
            friction = excluded.friction,
            tomorrow_one_thing = excluded.tomorrow_one_thing,
+           learned = case when $10 then excluded.learned else day_reviews.learned end,
            energy = excluded.energy,
            met_minimum = excluded.met_minimum`,
         [
@@ -1206,14 +1227,21 @@ export function createSqlDailySystem(executor: SqlExecutor, access: SqlDayAccess
           input.tomorrowOneThing,
           input.energy,
           input.metMinimum,
+          input.learned ?? null,
+          'learned' in input,
         ],
       );
 
+      const saved = await executor.query<{ learned: string | null }>(
+        `select learned from public.day_reviews where user_id = $1 and local_date = $2`,
+        [userId, input.localDate],
+      );
       return {
         localDate: input.localDate,
         wentWell: input.wentWell,
         friction: input.friction,
         tomorrowOneThing: input.tomorrowOneThing,
+        learned: saved.rows[0]?.learned ?? null,
         energy: input.energy,
         metMinimum: input.metMinimum,
       };

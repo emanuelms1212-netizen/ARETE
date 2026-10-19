@@ -1,42 +1,39 @@
 import { describe, expect, it } from 'vitest';
-import { resetProgram, truncatedTo60 } from './reset';
+import { RESET_BASE_DAYS, RESET_EXTENSION_DAYS } from '@/domain';
+import { resetExtensionDays, resetMainDays, resetSource } from './reset';
 
-describe('66-Day Reset content pack', () => {
+describe('the reset source data', () => {
   it('contains 66 consecutive days, matching the source and not its title', () => {
-    expect(resetProgram.days).toHaveLength(66);
-    expect(resetProgram.days.map((day) => day.day)).toEqual(
+    expect(resetSource.days).toHaveLength(66);
+    expect(resetSource.days.map((day) => day.day)).toEqual(
       Array.from({ length: 66 }, (_, index) => index + 1),
     );
   });
 
+  it('splits into the sixty-day programme and an optional six-day extension week', () => {
+    expect(resetMainDays).toHaveLength(RESET_BASE_DAYS);
+    expect(resetExtensionDays).toHaveLength(RESET_EXTENSION_DAYS);
+    expect(resetExtensionDays[0]?.day).toBe(61);
+  });
+
   it('keeps the 60-versus-66 discrepancy visible rather than resolving it silently', () => {
-    expect(resetProgram.title).toContain('66');
-    expect(resetProgram.sourceTitle).toContain('60');
-    expect(resetProgram.provenanceNote).toMatch(/66 numbered days/);
+    expect(resetSource.sourceTitle).toContain('60');
+    expect(resetSource.provenanceNote).toMatch(/66 numbered days/);
   });
 
   it('carries provenance and is marked editable', () => {
-    expect(resetProgram.source).toBe('66_Day_Reset_CALM_SLEEK_LINKED.pdf');
-    expect(resetProgram.sourceLicense).toBe('user-authored-personal');
-    expect(resetProgram.editable).toBe(true);
+    expect(resetSource.source).toBe('66_Day_Reset_CALM_SLEEK_LINKED.pdf');
+    expect(resetSource.sourceLicense).toBe('user-authored-personal');
+    expect(resetSource.editable).toBe(true);
   });
 
   it('treats cold exposure as opt-in rather than a default', () => {
-    expect(resetProgram.optInModules).toContain('coldShower');
+    expect(resetSource.optInModules).toContain('coldShower');
   });
 
-  it('offers a genuine 60-day variant that is labelled as truncated', () => {
-    const short = truncatedTo60();
-
-    expect(short.days).toHaveLength(60);
-    expect(short.title).toMatch(/truncated/i);
-    expect(short.id).not.toBe(resetProgram.id);
-  });
-
-  it('preserves the source progression endpoints', () => {
-    const first = resetProgram.days[0];
-    const last = resetProgram.days[65];
-
+  it('preserves the source progression endpoints, for reference only', () => {
+    const first = resetSource.days[0];
+    const last = resetSource.days[65];
     expect(first?.wake).toBe('07:00');
     expect(first?.waterLiters).toBe(2);
     expect(last?.wake).toBe('06:00');

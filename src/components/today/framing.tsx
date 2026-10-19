@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { Button, FormField, Section, Switch, TextArea, TextInput, useToast } from '@/components/ui';
+import { MORNING_PROMPTS, VIRTUES, type Virtue } from '@/domain';
 
 /**
  * The morning half of the day: an intention, and the dichotomy of control.
@@ -19,11 +20,15 @@ export interface FramingProps {
   readonly intention: string | null;
   readonly inMyControl: string | null;
   readonly notMyControl: string | null;
+  readonly virtue: Virtue | null;
+  readonly obstacle: string | null;
   readonly minimumMode: boolean;
   readonly onSave: (input: {
     intention?: string | null;
     inMyControl?: string | null;
     notMyControl?: string | null;
+    virtue?: Virtue | null;
+    obstacle?: string | null;
   }) => Promise<void>;
   readonly onMinimumMode: (on: boolean) => Promise<void>;
 }
@@ -32,6 +37,8 @@ export function Framing({
   intention,
   inMyControl,
   notMyControl,
+  virtue,
+  obstacle,
   minimumMode,
   onSave,
   onMinimumMode,
@@ -43,6 +50,8 @@ export function Framing({
   const [draftIntention, setDraftIntention] = useState(intention ?? '');
   const [draftControl, setDraftControl] = useState(inMyControl ?? '');
   const [draftRelease, setDraftRelease] = useState(notMyControl ?? '');
+  const [draftVirtue, setDraftVirtue] = useState<Virtue | ''>(virtue ?? '');
+  const [draftObstacle, setDraftObstacle] = useState(obstacle ?? '');
   const [pending, start] = useTransition();
   const { show } = useToast();
 
@@ -53,6 +62,8 @@ export function Framing({
           intention: draftIntention.trim() || null,
           inMyControl: draftControl.trim() || null,
           notMyControl: draftRelease.trim() || null,
+          virtue: draftVirtue === '' ? null : draftVirtue,
+          obstacle: draftObstacle.trim() || null,
         });
         setEditing(false);
       } catch {
@@ -81,7 +92,10 @@ export function Framing({
           </FormField>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <FormField label="Mine to do" hint="The part that depends on you.">
+            <FormField
+              label="Mine to do"
+              hint={`${MORNING_PROMPTS.inMyControl} The part that depends on you.`}
+            >
               {({ id, describedBy }) => (
                 <TextArea
                   id={id}
@@ -94,7 +108,10 @@ export function Framing({
               )}
             </FormField>
 
-            <FormField label="Not mine" hint="The part you can stop arguing with.">
+            <FormField
+              label="Not mine"
+              hint={`${MORNING_PROMPTS.notMyControl} The part you can stop arguing with.`}
+            >
               {({ id, describedBy }) => (
                 <TextArea
                   id={id}
@@ -103,6 +120,40 @@ export function Framing({
                   value={draftRelease}
                   onChange={(event) => setDraftRelease(event.target.value)}
                   placeholder="Whether they like it"
+                />
+              )}
+            </FormField>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField label={MORNING_PROMPTS.virtue} hint="Optional. One is plenty.">
+              {({ id, describedBy }) => (
+                <select
+                  id={id}
+                  aria-describedby={describedBy}
+                  value={draftVirtue}
+                  onChange={(event) => setDraftVirtue(event.target.value as Virtue | '')}
+                  className="min-h-11 w-full rounded-md border border-line-strong bg-surface px-3 text-body text-ink"
+                >
+                  <option value="">None today</option>
+                  {VIRTUES.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label} — {option.hint}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </FormField>
+
+            <FormField label={MORNING_PROMPTS.obstacle}>
+              {({ id, describedBy }) => (
+                <TextArea
+                  id={id}
+                  aria-describedby={describedBy}
+                  rows={2}
+                  value={draftObstacle}
+                  onChange={(event) => setDraftObstacle(event.target.value)}
+                  placeholder="The 3 pm slump — a walk before the next block"
                 />
               )}
             </FormField>
@@ -143,6 +194,29 @@ export function Framing({
                     Not mine
                   </dt>
                   <dd className="mt-1 text-body-sm text-ink">{notMyControl}</dd>
+                </div>
+              )}
+            </dl>
+          ) : null}
+
+          {virtue !== null || obstacle !== null ? (
+            <dl className="grid gap-3 sm:grid-cols-2">
+              {virtue === null ? null : (
+                <div className="rounded-md border border-line bg-sunken p-3">
+                  <dt className="text-label tracking-[0.08em] text-ink-muted uppercase">
+                    Practising
+                  </dt>
+                  <dd className="mt-1 text-body-sm text-ink">
+                    {VIRTUES.find((option) => option.value === virtue)?.label}
+                  </dd>
+                </div>
+              )}
+              {obstacle === null ? null : (
+                <div className="rounded-md border border-line bg-sunken p-3">
+                  <dt className="text-label tracking-[0.08em] text-ink-muted uppercase">
+                    Likely obstacle
+                  </dt>
+                  <dd className="mt-1 text-body-sm text-ink">{obstacle}</dd>
                 </div>
               )}
             </dl>

@@ -585,3 +585,91 @@ describe('nutrition', () => {
     expect(await rows(`select * from public.oil_awareness`)).toEqual([]);
   });
 });
+
+describe('programmes and reflection', () => {
+  let theirReset: string;
+
+  beforeAll(async () => {
+    await database.asOwner();
+    const reset = await database.db.query<{ id: string }>(
+      `insert into public.reset_enrolments (user_id, started_on, timezone)
+       values ($1, '2026-03-02', 'UTC') returning id`,
+      [USER_B],
+    );
+    theirReset = reset.rows[0]!.id;
+    await database.db.query(
+      `insert into public.contrast_screenings (user_id, answers) values ($1, '{"heart": false}')`,
+      [USER_B],
+    );
+    await database.db.query(
+      `insert into public.contrast_sessions
+         (user_id, local_date, timezone, protocol, phases_completed, status, started_at, ended_at)
+       values ($1, '2026-03-02', 'UTC', '{}', 1, 'completed', now(), now())`,
+      [USER_B],
+    );
+  });
+
+  it("cannot see another person's reset, screening or contrast sessions", async () => {
+    await database.asUser(USER_A);
+    expect(await rows(`select * from public.reset_enrolments where id = $1`, [theirReset])).toEqual(
+      [],
+    );
+    expect(await rows(`select * from public.contrast_screenings`)).toEqual([]);
+    expect(await rows(`select * from public.contrast_sessions`)).toEqual([]);
+  });
+
+  it("cannot log, pause or check in against another person's reset", async () => {
+    await database.asUser(USER_A);
+    await expect(
+      database.db.query(
+        `insert into public.reset_logs (user_id, enrolment_id, local_date, timezone, program_day, component, status)
+         values ($1, $2, '2026-03-02', 'UTC', 1, 'reading', 'done')`,
+        [USER_A, theirReset],
+      ),
+    ).rejects.toThrow(/does not belong to this user/);
+    await expect(
+      database.db.query(
+        `insert into public.reset_breaks (user_id, enrolment_id, kind, starts_on) values ($1, $2, 'pause', '2026-03-03')`,
+        [USER_A, theirReset],
+      ),
+    ).rejects.toThrow(/does not belong to this user/);
+    await expect(
+      database.db.query(
+        `insert into public.reset_checkins (user_id, enrolment_id, program_week, choice) values ($1, $2, 1, 'same')`,
+        [USER_A, theirReset],
+      ),
+    ).rejects.toThrow(/does not belong to this user/);
+  });
+
+  it('keeps one active reset, travel with an end date, and programme days in range', async () => {
+    await database.asOwner();
+    await expect(
+      database.db.query(
+        `insert into public.reset_enrolments (user_id, started_on, timezone) values ($1, '2026-04-01', 'UTC')`,
+        [USER_B],
+      ),
+    ).rejects.toThrow(/reset_enrolments_one_active/);
+    await expect(
+      database.db.query(
+        `insert into public.reset_breaks (user_id, enrolment_id, kind, starts_on) values ($1, $2, 'travel', '2026-03-05')`,
+        [USER_B, theirReset],
+      ),
+    ).rejects.toThrow(/reset_travel_has_end/);
+    await expect(
+      database.db.query(
+        `insert into public.reset_logs (user_id, enrolment_id, local_date, timezone, program_day, component, status)
+         values ($1, $2, '2026-03-02', 'UTC', 67, 'reading', 'done')`,
+        [USER_B, theirReset],
+      ),
+    ).rejects.toThrow(/program_day/);
+  });
+
+  it('refuses a virtue the journal does not know', async () => {
+    await database.asOwner();
+    await expect(
+      database.db.query(`update public.daily_plans set virtue = 'ambition' where user_id = $1`, [
+        USER_A,
+      ]),
+    ).rejects.toThrow(/daily_plan_virtue_known/);
+  });
+});

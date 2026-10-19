@@ -23,6 +23,7 @@ import { createSqlDailySystem } from './sql/daily-system';
 import { createSqlMind } from './sql/mind';
 import { createSqlFlexibility } from './sql/flexibility';
 import { createSqlNutrition } from './sql/nutrition';
+import { createSqlPrograms } from './sql/programs';
 import { createSqlTrain } from './sql/train';
 import type { SqlExecutor } from './sql-executor';
 
@@ -141,6 +142,7 @@ export function createSqlRepository(executor: SqlExecutor): AreteRepository {
   const train = createSqlTrain(executor);
   const flexibility = createSqlFlexibility(executor);
   const nutrition = createSqlNutrition(executor);
+  const programs = createSqlPrograms(executor);
 
   // ---------------------------------------------------------------------
   // Onboarding
@@ -356,6 +358,7 @@ export function createSqlRepository(executor: SqlExecutor): AreteRepository {
     ...train,
     ...flexibility,
     ...nutrition,
+    ...programs,
 
     async getOnboarding(userId: string) {
       return loadOnboarding(userId);

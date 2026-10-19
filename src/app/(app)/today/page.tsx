@@ -7,6 +7,7 @@ import { EveningReview } from '@/components/today/evening-review';
 import { Framing } from '@/components/today/framing';
 import { FocusSessionPanel } from '@/components/focus/focus-session';
 import { EmptyState, Metric, PageHeader, Section } from '@/components/ui';
+import { loadResetContext, type ResetContext } from '../programs/reset/context';
 import { computeDayProgress, describeDay, type DayProgress } from '@/domain';
 import { withUser } from '@/persistence';
 import { resolveCurrentDay } from '../current-day';
@@ -93,6 +94,33 @@ function MinimumDay({ progress }: { progress: DayProgress }) {
   );
 }
 
+function ResetToday({ reset }: { reset: ResetContext }) {
+  const state = reset.state;
+  if (!reset.enrolment || !state || state.kind === 'not_started') return null;
+  const done = reset.todaysLogs.filter((log) => log.status === 'done').length;
+  const line =
+    state.kind === 'active'
+      ? `Day ${state.programDay} of ${reset.length}: ${done} of ${reset.targets.length} done${reset.minimumDay ? ', minimum day' : ''}.`
+      : state.kind === 'paused'
+        ? 'Paused. The programme waits for you.'
+        : state.kind === 'sick'
+          ? 'On a sick or injury break. Rest first.'
+          : 'All days done. Choose what comes next.';
+  return (
+    <Section title="60-Day Reset">
+      <p className="text-body text-ink" data-testid="today-reset">
+        {line}
+      </p>
+      <Link
+        href="/programs/reset"
+        className="mt-2 inline-flex min-h-11 items-center text-body-sm text-accent hover:underline"
+      >
+        Open today’s reset
+      </Link>
+    </Section>
+  );
+}
+
 export default async function TodayPage() {
   const user = await getCurrentUser();
 
@@ -107,9 +135,8 @@ export default async function TodayPage() {
 
   // The page and the actions must agree on which day this screen is about;
   // `resolveCurrentDay` is the one answer both of them use.
-  const { day, framing, review, runningFocus, focusTasks, localDate, onboarded } = await withUser(
-    user.id,
-    async (repository) => {
+  const { day, framing, review, runningFocus, focusTasks, localDate, onboarded, reset } =
+    await withUser(user.id, async (repository) => {
       const { localDate: date } = await resolveCurrentDay(repository, user);
       const { progress } = await repository.getOnboarding(user.id);
 
@@ -125,9 +152,10 @@ export default async function TodayPage() {
         ),
         localDate: date,
         onboarded: progress.completedAt !== null,
+        // The reset's day, so Today can say where it stands and link to it.
+        reset: await loadResetContext(repository, user.id, date),
       };
-    },
-  );
+    });
 
   const resolvedDay = day ?? {
     date: localDate,
@@ -151,6 +179,8 @@ export default async function TodayPage() {
         intention={framing.intention}
         inMyControl={framing.inMyControl}
         notMyControl={framing.notMyControl}
+        virtue={framing.virtue}
+        obstacle={framing.obstacle}
         minimumMode={framing.minimumMode}
         onSave={setFramingAction}
         onMinimumMode={setMinimumModeAction}
@@ -176,7 +206,17 @@ export default async function TodayPage() {
         onFinish={finishFocusAction}
       />
 
+      <ResetToday reset={reset} />
+
       <EveningReview progress={progress} existing={review} onSave={saveDayReviewAction} />
+
+      <p className="text-body-sm text-ink-muted">
+        The morning and evening questions are your journal.{' '}
+        <Link href="/reflect" className="text-accent hover:underline">
+          See the week and write the weekly review
+        </Link>
+        .
+      </p>
     </div>
   );
 }

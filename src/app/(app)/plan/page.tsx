@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { getCurrentUser } from '@/auth';
 import { PlanBoard } from '@/components/plan/plan-board';
 import { EmptyState, PageHeader } from '@/components/ui';
@@ -131,6 +132,22 @@ export default async function PlanPage() {
         title="Plan"
         lede="What you are working towards, what is on the list, and what you do most days."
       />
+      <nav aria-label="More in Plan" className="grid grid-cols-2 gap-3">
+        <Link
+          href="/programs"
+          className="rounded-xl border border-line bg-surface p-3 hover:border-line-strong"
+        >
+          <span className="block text-body font-semibold text-ink">Programmes</span>
+          <span className="block text-body-sm text-ink-muted">60-Day Reset and more</span>
+        </Link>
+        <Link
+          href="/reflect"
+          className="rounded-xl border border-line bg-surface p-3 hover:border-line-strong"
+        >
+          <span className="block text-body font-semibold text-ink">Journal</span>
+          <span className="block text-body-sm text-ink-muted">Days and the weekly review</span>
+        </Link>
+      </nav>
 
       <PlanBoard
         goals={data.goals}

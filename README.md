@@ -12,7 +12,7 @@ Working title. Renaming is a one-line change in `src/lib/app-config.ts`.
 
 ## Status
 
-**Stage 10 of 17 — Nutrition.** There is a real schema: 53 tables, row-level security on every one of them, and an authorization test suite
+**Stage 11 of 17 — Programmes and reflection.** There is a real schema: 59 tables, row-level security on every one of them, and an authorization test suite
 that runs against a real Postgres and actually tries to read another user's data. The app
 reads the signed-in user's own local day through a repository interface with two
 interchangeable implementations.
@@ -48,6 +48,13 @@ are ranges with their working shown, overridable, and never a budget. Safeguards
 pregnancy and postpartum, eating-disorder risk and prescribed diets remove what should not be
 there, and every number can be hidden. Demo foods say their numbers are synthetic. An optional
 weight trend and an optional ingredient/oil awareness preference are both off by default.
+
+Programmes are live: a 60-day reset whose every number is a range fitted to the person and
+editable before and during, with pause, travel, sick days, minimum days, weekly check-ins and
+an optional extension week for the source's days 61–66. The Stoic journal runs through Today's
+morning and evening questions into a weekly review that sets the week's facts beside the
+person's reflection. Contrast therapy is an optional, screened pack with a conservative timer
+that is always one tap from stopping.
 
 Progress still renders an honest "not built yet" state naming the stage that builds it.
 

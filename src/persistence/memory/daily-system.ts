@@ -13,6 +13,7 @@ import {
   type Measurement,
   type Milestone,
   type Recurrence,
+  type Virtue,
 } from '@/domain';
 import type { DemoSeed } from '../demo-data';
 import {
@@ -629,6 +630,8 @@ export function createMemoryDailySystem(access: DayAccess) {
           intention: null,
           inMyControl: null,
           notMyControl: null,
+          virtue: null,
+          obstacle: null,
           minimumMode: false,
         }
       );
@@ -642,12 +645,16 @@ export function createMemoryDailySystem(access: DayAccess) {
         intention?: string | null;
         inMyControl?: string | null;
         notMyControl?: string | null;
+        virtue?: Virtue | null;
+        obstacle?: string | null;
       },
     ): Promise<DayFraming> {
       const current = framings.get(dayKey(userId, input.localDate)) ?? {
         intention: null,
         inMyControl: null,
         notMyControl: null,
+        virtue: null,
+        obstacle: null,
         minimumMode: false,
       };
 
@@ -655,6 +662,8 @@ export function createMemoryDailySystem(access: DayAccess) {
         intention: 'intention' in input ? (input.intention ?? null) : current.intention,
         inMyControl: 'inMyControl' in input ? (input.inMyControl ?? null) : current.inMyControl,
         notMyControl: 'notMyControl' in input ? (input.notMyControl ?? null) : current.notMyControl,
+        virtue: 'virtue' in input ? (input.virtue ?? null) : current.virtue,
+        obstacle: 'obstacle' in input ? (input.obstacle ?? null) : current.obstacle,
         minimumMode: current.minimumMode,
       };
 
@@ -670,6 +679,8 @@ export function createMemoryDailySystem(access: DayAccess) {
         intention: null,
         inMyControl: null,
         notMyControl: null,
+        virtue: null,
+        obstacle: null,
         minimumMode: false,
       };
       framings.set(dayKey(userId, input.localDate), { ...current, minimumMode: input.on });
@@ -779,6 +790,10 @@ export function createMemoryDailySystem(access: DayAccess) {
         wentWell: input.wentWell,
         friction: input.friction,
         tomorrowOneThing: input.tomorrowOneThing,
+        learned:
+          'learned' in input
+            ? (input.learned ?? null)
+            : (reviews.get(dayKey(userId, input.localDate))?.learned ?? null),
         energy: input.energy,
         metMinimum: input.metMinimum,
       };

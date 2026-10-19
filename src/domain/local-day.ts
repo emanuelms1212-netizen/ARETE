@@ -134,3 +134,60 @@ export function monthOf(localDate: IsoDate): { year: number; month: number; day:
 export function instantBelongsToDay(instant: Date, localDate: IsoDate, timeZone: string): boolean {
   return toLocalDate(instant, timeZone) === localDate;
 }
+
+const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+const DAY_LONG = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+] as const;
+const MONTH_SHORT = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
+const MONTH_LONG = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+] as const;
+
+/**
+ * A calendar date in words, the same on the server and in every browser.
+ *
+ * `toLocaleDateString` is not: Node and Chromium ship different ICU data and
+ * disagree about a comma ("Wed 18 Mar" against "Wed, 18 Mar"), which breaks
+ * hydration for any date a client component renders.
+ */
+export function formatLocalDate(localDate: IsoDate, style: 'short' | 'long' | 'day'): string {
+  const parsed = new Date(`${localDate}T12:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return localDate;
+  const weekday = parsed.getUTCDay();
+  const day = parsed.getUTCDate();
+  const month = parsed.getUTCMonth();
+  if (style === 'day') return `${DAY_SHORT[weekday]} ${day}`;
+  if (style === 'short') return `${DAY_SHORT[weekday]} ${day} ${MONTH_SHORT[month]}`;
+  return `${DAY_LONG[weekday]} ${day} ${MONTH_LONG[month]}`;
+}

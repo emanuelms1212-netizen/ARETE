@@ -2,12 +2,12 @@
 
 import { useState, useTransition } from 'react';
 import { Button, ChoiceList, FormField, Section, TextArea, useToast } from '@/components/ui';
-import type { DayProgress } from '@/domain';
+import { EVENING_PROMPTS, type DayProgress } from '@/domain';
 
 /**
  * The evening half of the day.
  *
- * Three questions, in the order a tired person can answer them: what worked,
+ * Four short questions (the Stoic journal's evening page), in the order a tired person can answer them: what worked,
  * what got in the way, and the one thing tomorrow is for. A review with ten
  * questions is a review that does not happen.
  *
@@ -22,6 +22,7 @@ export interface EveningReviewProps {
     readonly wentWell: string | null;
     readonly friction: string | null;
     readonly tomorrowOneThing: string | null;
+    readonly learned?: string | null;
     readonly energy: 'low' | 'steady' | 'high' | null;
     readonly metMinimum: boolean | null;
   } | null;
@@ -29,6 +30,7 @@ export interface EveningReviewProps {
     wentWell: string | null;
     friction: string | null;
     tomorrowOneThing: string | null;
+    learned: string | null;
     energy: 'low' | 'steady' | 'high' | null;
     metMinimum: boolean | null;
   }) => Promise<void>;
@@ -39,6 +41,7 @@ export function EveningReview({ progress, existing, onSave }: EveningReviewProps
   const [wentWell, setWentWell] = useState(existing?.wentWell ?? '');
   const [friction, setFriction] = useState(existing?.friction ?? '');
   const [tomorrow, setTomorrow] = useState(existing?.tomorrowOneThing ?? '');
+  const [learned, setLearned] = useState(existing?.learned ?? '');
   const [energy, setEnergy] = useState<'low' | 'steady' | 'high' | null>(existing?.energy ?? null);
   const [pending, start] = useTransition();
   const { show } = useToast();
@@ -74,6 +77,7 @@ export function EveningReview({ progress, existing, onSave }: EveningReviewProps
                 wentWell: wentWell.trim() || null,
                 friction: friction.trim() || null,
                 tomorrowOneThing: tomorrow.trim() || null,
+                learned: learned.trim() || null,
                 energy,
                 metMinimum: progress.minimumDayMet,
               });
@@ -84,7 +88,10 @@ export function EveningReview({ progress, existing, onSave }: EveningReviewProps
           });
         }}
       >
-        <FormField label="What went well?" hint="However small. This is the one people skip.">
+        <FormField
+          label={EVENING_PROMPTS.wentWell}
+          hint="However small. This is the one people skip."
+        >
           {({ id, describedBy }) => (
             <TextArea
               id={id}
@@ -99,9 +106,12 @@ export function EveningReview({ progress, existing, onSave }: EveningReviewProps
 
         {/* Deliberately not "What got in the way?" — the skip dialog already
             asks that about a single item, and two identical labels on one
-            screen are ambiguous to anyone navigating by label, screen-reader
-            users first among them. This one is about the day. */}
-        <FormField label="What slowed the day down?">
+            screen are ambiguous to anyone navigating by label. This one is
+            the Stoic journal's question about the day. */}
+        <FormField
+          label={EVENING_PROMPTS.friction}
+          hint="Not a confession. Just where it happened."
+        >
           {({ id, describedBy }) => (
             <TextArea
               id={id}
@@ -109,12 +119,25 @@ export function EveningReview({ progress, existing, onSave }: EveningReviewProps
               rows={2}
               value={friction}
               onChange={(event) => setFriction(event.target.value)}
-              placeholder="Afternoon disappeared into email"
+              placeholder="Answered email in the first hour instead of writing"
             />
           )}
         </FormField>
 
-        <FormField label="One thing for tomorrow" hint="One. Not a list.">
+        <FormField label={EVENING_PROMPTS.learned}>
+          {({ id, describedBy }) => (
+            <TextArea
+              id={id}
+              aria-describedby={describedBy}
+              rows={2}
+              value={learned}
+              onChange={(event) => setLearned(event.target.value)}
+              placeholder="I write better before I read anything"
+            />
+          )}
+        </FormField>
+
+        <FormField label={EVENING_PROMPTS.tomorrowOneThing} hint="One. Not a list.">
           {({ id, describedBy }) => (
             <TextArea
               id={id}

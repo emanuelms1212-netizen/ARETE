@@ -16,6 +16,7 @@ import { createMemoryDailySystem } from './memory/daily-system';
 import { createMemoryMind } from './memory/mind';
 import { createMemoryFlexibility } from './memory/flexibility';
 import { createMemoryNutrition } from './memory/nutrition';
+import { createMemoryPrograms } from './memory/programs';
 import { demoNutrition } from './demo-nutrition';
 import { createMemoryTrain } from './memory/train';
 import { demoTraining } from './demo-training';
@@ -165,6 +166,15 @@ export function createMemoryRepository(
   });
   if (planSeed !== null) seedNutrition(seedUserId, demoNutrition());
 
+  // The reset, the journal's weekly review and contrast therapy. The journal's
+  // daily pages are the framing and review the day system already holds.
+  const { exportPrograms, deletePrograms, ...programs } = createMemoryPrograms({
+    readDay: async (userId, localDate) => ({
+      framing: await daily.getFraming(userId, localDate),
+      review: await daily.getDayReview(userId, localDate),
+    }),
+  });
+
   function onboardingFor(userId: string): OnboardingRecord {
     let record = state.onboarding.get(userId);
     if (!record) {
@@ -219,6 +229,7 @@ export function createMemoryRepository(
     ...train,
     ...flexibility,
     ...nutrition,
+    ...programs,
 
     async getOnboarding(userId: string) {
       return onboardingState(userId);
@@ -401,6 +412,7 @@ export function createMemoryRepository(
           ...exportTrain(userId),
           ...exportFlexibility(userId),
           ...exportNutrition(userId),
+          ...exportPrograms(userId),
         },
       };
     },
@@ -415,6 +427,7 @@ export function createMemoryRepository(
       deleteTrain(userId);
       deleteFlexibility(userId);
       deleteNutrition(userId);
+      deletePrograms(userId);
     },
   };
 }

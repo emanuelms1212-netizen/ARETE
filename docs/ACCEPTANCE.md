@@ -845,7 +845,77 @@ travel; and the three Today metrics wrapped 2-then-1, so they became a three-col
 - [ ] **Dietitian review of the targets** — needed before launch (ledger §7)
 - [ ] **Migrations applied to a hosted database** — still no Supabase project.
 
-## Stages 11–17 — not started
+## Stage 11 — Programmes and reflection
 
-Tracked in `docs/PROJECT_LEDGER.md` §8. No item below stage 11 may be ticked before the
+### The 60-day reset
+
+- [x] A normalised 60-day template from the source: wake window, water, movement, study,
+      reading, meditation, an optional cool shower finish, an optional social-media limit,
+      planning tomorrow, sleep and a weekly reflection
+- [x] **Days 61–66 handled transparently**: an optional extension week, off by default, offered
+      before the start and at the finish, stated on screen and in SOURCE_MAP §1 (D96)
+- [x] Fixed escalating targets turned into editable suggested ranges, worked out from body
+      size, climate, schedule, experience and recovery — no 4 L of water or two-hour sessions
+      for everyone (D97)
+- [x] Programme preview: every block, every range, the source's own numbers beside them
+- [x] Customisation: components on and off, own ranges, wake and bed times, climate,
+      intensity, the extension week; cold needs its safety note read first
+- [x] Start date (today or the next four weeks), pause, travel mode, sick/injury mode
+- [x] Minimum day: Today's switch shrinks the reset to its essentials
+- [x] Weekly adjustment: a check-in that moves the next week's ranges a step (D99)
+- [x] Finish/continue: add the extension week, start again with the same settings, or finish;
+      ending early keeps every log
+
+### The Stoic journal
+
+- [x] Morning: in my control, not in my control, the quality to practise, today's obstacle
+- [x] Evening: what I did well, where judgement or impulse took over, what I learned, one
+      adjustment for tomorrow
+- [x] Weekly review: the week's facts from the records beside three reflective prompts,
+      calm and non-judgemental (counts, never percentages or "missed")
+- [x] Quotes optional, attributed and verified — or none (D104)
+
+### Contrast therapy
+
+- [x] Optional advanced pack; never part of a streak, a reset day or a commitment (D102)
+- [x] Screening for cardiovascular, blood-pressure, pregnancy, fainting, neuropathy, medicine
+      and temperature-sensitivity concerns, with professional guidance when any applies (D100)
+- [x] Timers for heat and cold with conservative, configurable defaults and a prominent stop
+      control (D101)
+- [x] The source's benefit claims labelled as commonly cited rationale, not fact
+- [x] Linked from the reset on active days as optional, and off unless set up
+
+### Acceptance, as the prompt states it
+
+- [x] **A user can inspect and edit the full programme before starting** — in a browser
+- [x] **Pausing and travel do not corrupt schedules** — 120 calendar days of mixed breaks in
+      unit tests; pause, resume and travel in a browser
+- [x] **Days 61–66 are handled transparently**
+- [x] **Reflection and optional recovery data appear on the correct local day** — journal,
+      weekly review, reset logs and contrast sessions all keyed to the resolved local day
+
+### Security
+
+- [x] Row-level security on all six new tables; a trigger refuses logs, breaks or check-ins
+      against another person's reset — adversarial tests
+- [x] New tables in the account export and deleted with the account
+
+### Verification
+
+- [x] `npm test` — **1125** unit, component and database tests
+- [x] `npm run e2e` — **186** end-to-end tests (25 skipped by design, D76), run
+      twice against a freshly started server; new pages fail the run on any console error
+- [x] Format, lint, typecheck and build all clean
+- [x] Screenshots inspected at 390×844 and 1440×900 — Programmes, the reset before and
+      during, contrast screening, the journal week and Today
+
+### Not done, and why
+
+- [ ] **Clinical review of the contrast screening and the cold note** — before launch (ledger §7)
+- [ ] **Backfilling reset items for past days** — today only for now
+- [ ] **Migrations applied to a hosted database** — still no Supabase project.
+
+## Stages 12–17 — not started
+
+Tracked in `docs/PROJECT_LEDGER.md` §8. No item below stage 12 may be ticked before the
 stage that builds it has run and been verified.

@@ -44,7 +44,7 @@ export const CONTENT_SOURCES: readonly SeededSource[] = [
     author: null,
     licence: 'user-authored-personal',
     rightsNote:
-      'Titled 60-Day, contains 66 numbered days. Ships as a 66-day template with the discrepancy stated.',
+      'Titled 60-Day, contains 66 numbered days. Runs as 60 days with days 61-66 as an optional extension week, the discrepancy stated.',
     pages: 38,
   },
   {
@@ -122,13 +122,13 @@ interface SeededPack {
 export const CONTENT_PACKS: readonly SeededPack[] = [
   {
     slug: 'reset-66-day',
-    title: '66-Day Reset',
+    title: '60-Day Reset',
     kind: 'program',
     sourceSlug: 'reset-66-day',
     requiresExplicitChoice: false,
     requiresSafetyAcknowledgement: false,
     provenanceNote:
-      'The source PDF is titled 60-Day and contains 66 numbered days. Shipped as 66 days, with a labelled 60-day variant. Every parameter is a default the user can change.',
+      'The source PDF is titled 60-Day and contains 66 numbered days. ARETE runs 60 days; days 61-66 are an optional extension week the person can add. Every target is an editable range.',
   },
   {
     slug: 'contrast-therapy',

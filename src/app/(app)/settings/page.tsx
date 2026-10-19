@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { PageHeader, Section } from '@/components/ui';
 import { appConfig } from '@/lib/app-config';
 import { env } from '@/lib/env';
@@ -8,7 +9,6 @@ export const metadata: Metadata = { title: 'Settings' };
 
 const plannedSections: readonly { name: string; stage: string }[] = [
   { name: 'Profile and preferences', stage: 'stage 5' },
-  { name: 'Programs — 66-Day Reset, mobility, meditation packs', stage: 'stage 11' },
   { name: 'Modules, including opt-in safety modules', stage: 'stage 13' },
   { name: 'Notifications', stage: 'stage 12' },
   { name: 'Data — export and delete', stage: 'stage 13' },
@@ -38,6 +38,12 @@ export default function SettingsPage() {
           In demo mode the app reads a fixed, deterministic sample through the same repository
           interface real data will use. No account exists yet and nothing is written anywhere.
         </p>
+      </Section>
+
+      <Section title="Programmes" hint="The 60-Day Reset, contrast therapy and the journal.">
+        <Link href="/programs" className="text-body text-accent hover:underline">
+          Open Programmes
+        </Link>
       </Section>
 
       <Section

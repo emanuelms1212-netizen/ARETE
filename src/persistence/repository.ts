@@ -18,6 +18,17 @@ import type {
   OnboardingProgress,
   OnboardingStep,
   Recurrence,
+  Virtue,
+  ContrastScreening,
+  ContrastSessionRecord,
+  ResetBreak,
+  ResetBreakKind,
+  ResetCheckin,
+  ResetComponent,
+  ResetCustomisation,
+  ResetLog,
+  ResetLogStatus,
+  WeeklyPromptKey,
 } from '@/domain';
 import type {
   Block,
@@ -163,6 +174,8 @@ export interface DayRepository {
       readonly intention?: string | null;
       readonly inMyControl?: string | null;
       readonly notMyControl?: string | null;
+      readonly virtue?: Virtue | null;
+      readonly obstacle?: string | null;
     },
   ): Promise<DayFraming>;
 
@@ -443,6 +456,9 @@ export interface DayFraming {
   readonly intention: string | null;
   readonly inMyControl: string | null;
   readonly notMyControl: string | null;
+  /** The Stoic journal's morning half (domain/journal.ts). */
+  readonly virtue: Virtue | null;
+  readonly obstacle: string | null;
   readonly minimumMode: boolean;
 }
 
@@ -451,6 +467,8 @@ export interface DayReview {
   readonly wentWell: string | null;
   readonly friction: string | null;
   readonly tomorrowOneThing: string | null;
+  /** What the day taught. Optional on write, so older callers do not have to know it. */
+  readonly learned?: string | null;
   readonly energy: 'low' | 'steady' | 'high' | null;
   readonly metMinimum: boolean | null;
 }
@@ -845,6 +863,149 @@ export interface NutritionRepository {
   deleteOilAwareness(userId: string): Promise<void>;
 }
 
+// ---------------------------------------------------------------------------
+// Programmes and reflection
+// ---------------------------------------------------------------------------
+
+export interface ResetEnrolment {
+  readonly id: string;
+  readonly startedOn: IsoDate;
+  readonly timeZone: string;
+  readonly customisation: ResetCustomisation;
+  readonly status: 'active' | 'finished' | 'ended';
+  readonly breaks: readonly ResetBreak[];
+}
+
+export interface JournalDay {
+  readonly localDate: IsoDate;
+  readonly framing: DayFraming | null;
+  readonly review: DayReview | null;
+}
+
+export interface ProgramsRepository {
+  getActiveReset(userId: string): Promise<ResetEnrolment | null>;
+  /** The most recent finished or ended programme, for the finish screen and "start again". */
+  getLastReset(userId: string): Promise<ResetEnrolment | null>;
+  /** Refused while another reset is active. */
+  startReset(
+    userId: string,
+    input: {
+      readonly startedOn: IsoDate;
+      readonly timeZone: string;
+      readonly customisation: ResetCustomisation;
+    },
+  ): Promise<ResetEnrolment>;
+  updateResetCustomisation(
+    userId: string,
+    enrolmentId: string,
+    customisation: ResetCustomisation,
+  ): Promise<ResetEnrolment>;
+  addResetBreak(
+    userId: string,
+    enrolmentId: string,
+    input: { readonly kind: ResetBreakKind; readonly from: IsoDate; readonly to: IsoDate | null },
+  ): Promise<ResetEnrolment>;
+  /**
+   * Ends a break so the programme resumes on `resumeOn`. A break that had not
+   * started yet by then is removed, as if it had never been planned.
+   */
+  endResetBreak(
+    userId: string,
+    enrolmentId: string,
+    breakId: string,
+    resumeOn: IsoDate,
+  ): Promise<ResetEnrolment>;
+  endReset(
+    userId: string,
+    enrolmentId: string,
+    status: 'finished' | 'ended',
+    at: Date,
+  ): Promise<ResetEnrolment>;
+  /** One record per component per day; logging again changes it. */
+  logResetItem(
+    userId: string,
+    input: {
+      readonly enrolmentId: string;
+      readonly localDate: IsoDate;
+      readonly timeZone: string;
+      readonly programDay: number;
+      readonly component: ResetComponent;
+      readonly status: ResetLogStatus;
+      readonly targetText: string;
+    },
+  ): Promise<ResetLog>;
+  clearResetItem(
+    userId: string,
+    input: {
+      readonly enrolmentId: string;
+      readonly localDate: IsoDate;
+      readonly component: ResetComponent;
+    },
+  ): Promise<void>;
+  listResetLogs(userId: string, enrolmentId: string): Promise<readonly ResetLog[]>;
+  /** Across every programme, for the weekly review. */
+  countResetDone(
+    userId: string,
+    range: { readonly from: IsoDate; readonly to: IsoDate },
+  ): Promise<number>;
+  /** One per programme week; a second for the same week is refused. */
+  saveResetCheckin(
+    userId: string,
+    enrolmentId: string,
+    checkin: ResetCheckin,
+  ): Promise<ResetCheckin>;
+  listResetCheckins(userId: string, enrolmentId: string): Promise<readonly ResetCheckin[]>;
+
+  /** The Stoic journal, day by day: Today's framing and review, where either has words. */
+  listJournal(
+    userId: string,
+    range: { readonly from: IsoDate; readonly to: IsoDate },
+  ): Promise<readonly JournalDay[]>;
+  getWeeklyReview(
+    userId: string,
+    weekStart: IsoDate,
+  ): Promise<Partial<Record<WeeklyPromptKey, string>>>;
+  saveWeeklyReview(
+    userId: string,
+    input: {
+      readonly weekStart: IsoDate;
+      readonly timeZone: string;
+      readonly answers: Partial<Record<WeeklyPromptKey, string | null>>;
+    },
+  ): Promise<Partial<Record<WeeklyPromptKey, string>>>;
+
+  /** Contrast therapy. Null means the pack has never been set up, or was turned off. */
+  getContrastScreening(userId: string): Promise<ContrastScreening | null>;
+  saveContrastScreening(userId: string, screening: ContrastScreening): Promise<ContrastScreening>;
+  /** The version of the contrast safety notice acknowledged, if any. */
+  getSafetyAcknowledgement(
+    userId: string,
+    topic: 'contrast_therapy' | 'cold_exposure',
+  ): Promise<string | null>;
+  acknowledgeSafety(
+    userId: string,
+    input: {
+      readonly topic: 'contrast_therapy' | 'cold_exposure';
+      readonly version: string;
+      readonly at: Date;
+    },
+  ): Promise<void>;
+  /** Turns the pack off: deletes the screening and its acknowledgement. Sessions stay unless deleted. */
+  disableContrast(userId: string): Promise<void>;
+  recordContrastSession(
+    userId: string,
+    input: Omit<ContrastSessionRecord, 'id'> & {
+      readonly timeZone: string;
+      readonly clientToken: string;
+    },
+  ): Promise<ContrastSessionRecord>;
+  listContrastSessions(
+    userId: string,
+    range: { readonly from: IsoDate; readonly to: IsoDate },
+  ): Promise<readonly ContrastSessionRecord[]>;
+  deleteContrastSessions(userId: string): Promise<void>;
+}
+
 export interface AccountRepository {
   /** Everything the account holds, as one document. Immediate, no queue. */
   exportEverything(userId: string): Promise<AccountExport>;
@@ -864,6 +1025,7 @@ export interface AreteRepository
     TrainRepository,
     FlexibilityRepository,
     NutritionRepository,
+    ProgramsRepository,
     FocusSessionRepository,
     AccountRepository {
   readonly kind: 'memory' | 'sql';

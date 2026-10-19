@@ -110,3 +110,13 @@ describe('calendar arithmetic', () => {
     expect(startOfWeek('2026-03-16', 1)).toBe('2026-03-16');
   });
 });
+
+describe('formatLocalDate', () => {
+  it('writes dates the same way everywhere, with no locale data involved', async () => {
+    const { formatLocalDate } = await import('./local-day');
+    expect(formatLocalDate('2026-03-18', 'short')).toBe('Wed 18 Mar');
+    expect(formatLocalDate('2026-03-18', 'long')).toBe('Wednesday 18 March');
+    expect(formatLocalDate('2026-03-18', 'day')).toBe('Wed 18');
+    expect(formatLocalDate('not-a-date', 'long')).toBe('not-a-date');
+  });
+});

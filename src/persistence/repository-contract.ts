@@ -6,6 +6,11 @@ import {
   generateFirstWeek,
   generateTrainingPlan,
   trainingSetupSchema,
+  CONTRAST_NOTICE_VERSION,
+  CONTRAST_SCREENING_QUESTIONS,
+  GENTLE_PROTOCOL,
+  resetCustomisationSchema,
+  type ContrastScreening,
   type WorkoutSnapshot,
 } from '@/domain';
 import type { AreteRepository } from './repository';
@@ -2487,6 +2492,283 @@ export function describeRepositoryContract(
         const after = await repository.exportEverything(userId);
         expect(after.tables['oil_awareness'] ?? []).toHaveLength(0);
         expect(after.tables['food_entries']).toHaveLength(1);
+      });
+    });
+
+    describe('programmes and reflection', () => {
+      const START = '2026-03-02';
+      const custom = (input: object = {}) => resetCustomisationSchema.parse(input);
+
+      it('starts one reset at a time, and keeps what the person changed', async () => {
+        const { repository, userId } = await fresh();
+        expect(await repository.getActiveReset(userId)).toBeNull();
+        const started = await repository.startReset(userId, {
+          startedOn: START,
+          timeZone: ZONE,
+          customisation: custom({ wakeTime: '07:30', ranges: { reading: { min: 3, max: 4 } } }),
+        });
+        expect(started).toMatchObject({ startedOn: START, status: 'active', breaks: [] });
+        expect(started.customisation.ranges.reading).toEqual({ min: 3, max: 4 });
+        await expect(
+          repository.startReset(userId, {
+            startedOn: START,
+            timeZone: ZONE,
+            customisation: custom(),
+          }),
+        ).rejects.toThrow(/already running/);
+
+        const edited = await repository.updateResetCustomisation(
+          userId,
+          started.id,
+          custom({ intensity: 1, includeExtension: true }),
+        );
+        expect(edited.customisation).toMatchObject({ intensity: 1, includeExtension: true });
+        expect((await repository.getActiveReset(userId))?.customisation.intensity).toBe(1);
+      });
+
+      it('records breaks, refuses overlaps, and resumes cleanly', async () => {
+        const { repository, userId } = await fresh();
+        const { id } = await repository.startReset(userId, {
+          startedOn: START,
+          timeZone: ZONE,
+          customisation: custom(),
+        });
+        let enrolment = await repository.addResetBreak(userId, id, {
+          kind: 'travel',
+          from: '2026-03-10',
+          to: '2026-03-12',
+        });
+        await expect(
+          repository.addResetBreak(userId, id, { kind: 'pause', from: '2026-03-11', to: null }),
+        ).rejects.toThrow(/overlaps/);
+        enrolment = await repository.addResetBreak(userId, id, {
+          kind: 'pause',
+          from: '2026-03-14',
+          to: null,
+        });
+        const pause = enrolment.breaks.find((entry) => entry.kind === 'pause')!;
+        enrolment = await repository.endResetBreak(userId, id, pause.id, '2026-03-17');
+        expect(enrolment.breaks.find((entry) => entry.id === pause.id)?.to).toBe('2026-03-16');
+        // A planned trip cancelled before it began disappears.
+        const trip = enrolment.breaks.find((entry) => entry.kind === 'travel')!;
+        enrolment = await repository.endResetBreak(userId, id, trip.id, '2026-03-09');
+        expect(enrolment.breaks.map((entry) => entry.kind)).toEqual(['pause']);
+      });
+
+      it('logs one record per component per day, with the day and target as they were', async () => {
+        const { repository, userId } = await fresh();
+        const { id } = await repository.startReset(userId, {
+          startedOn: START,
+          timeZone: ZONE,
+          customisation: custom(),
+        });
+        const base = { enrolmentId: id, localDate: START, timeZone: ZONE, programDay: 1 };
+        await repository.logResetItem(userId, {
+          ...base,
+          component: 'reading',
+          status: 'skipped',
+          targetText: '5–10 pages',
+        });
+        await repository.logResetItem(userId, {
+          ...base,
+          component: 'reading',
+          status: 'done',
+          targetText: '5–10 pages',
+        });
+        await repository.logResetItem(userId, {
+          ...base,
+          component: 'movement',
+          status: 'done',
+          targetText: '20–25 min',
+        });
+        const logs = await repository.listResetLogs(userId, id);
+        expect(logs).toEqual([
+          {
+            localDate: START,
+            programDay: 1,
+            component: 'movement',
+            status: 'done',
+            targetText: '20–25 min',
+          },
+          {
+            localDate: START,
+            programDay: 1,
+            component: 'reading',
+            status: 'done',
+            targetText: '5–10 pages',
+          },
+        ]);
+        expect(await repository.countResetDone(userId, { from: START, to: START })).toBe(2);
+        await repository.clearResetItem(userId, {
+          enrolmentId: id,
+          localDate: START,
+          component: 'reading',
+        });
+        expect(await repository.listResetLogs(userId, id)).toHaveLength(1);
+        await expect(
+          repository.logResetItem(userId, {
+            ...base,
+            programDay: 99,
+            component: 'reading',
+            status: 'done',
+            targetText: '',
+          }),
+        ).rejects.toThrow(/programme day/);
+      });
+
+      it('takes one check-in a week, and ends with the logs kept', async () => {
+        const { repository, userId } = await fresh();
+        const { id } = await repository.startReset(userId, {
+          startedOn: START,
+          timeZone: ZONE,
+          customisation: custom(),
+        });
+        await repository.saveResetCheckin(userId, id, {
+          programWeek: 1,
+          choice: 'harder',
+          note: null,
+        });
+        await expect(
+          repository.saveResetCheckin(userId, id, { programWeek: 1, choice: 'easier', note: null }),
+        ).rejects.toThrow(/already has a check-in/);
+        expect(await repository.listResetCheckins(userId, id)).toEqual([
+          { programWeek: 1, choice: 'harder', note: null },
+        ]);
+        await repository.logResetItem(userId, {
+          enrolmentId: id,
+          localDate: START,
+          timeZone: ZONE,
+          programDay: 1,
+          component: 'sleep',
+          status: 'done',
+          targetText: '7–9 h',
+        });
+        const ended = await repository.endReset(
+          userId,
+          id,
+          'finished',
+          new Date('2026-05-01T09:00:00Z'),
+        );
+        expect(ended.status).toBe('finished');
+        expect(await repository.getActiveReset(userId)).toBeNull();
+        expect((await repository.getLastReset(userId))?.id).toBe(id);
+        expect(await repository.listResetLogs(userId, id)).toHaveLength(1);
+        await expect(repository.updateResetCustomisation(userId, id, custom())).rejects.toThrow(
+          /ended/,
+        );
+      });
+
+      it('keeps the Stoic journal on Today’s framing and review, on the right day', async () => {
+        const { repository, userId } = await fresh();
+        await repository.setFraming(userId, {
+          localDate: DAY,
+          timeZone: ZONE,
+          inMyControl: 'Starting on time.',
+          virtue: 'courage',
+          obstacle: 'The 3 pm slump — walk first.',
+        });
+        await repository.saveDayReview(userId, {
+          localDate: DAY,
+          timeZone: ZONE,
+          wentWell: 'Started on time.',
+          friction: 'Answered email in the first hour.',
+          tomorrowOneThing: 'Phone in the drawer.',
+          learned: 'Mornings are when I write.',
+          energy: null,
+          metMinimum: null,
+        });
+        const framing = await repository.getFraming(userId, DAY);
+        expect(framing).toMatchObject({
+          virtue: 'courage',
+          obstacle: 'The 3 pm slump — walk first.',
+        });
+        const journal = await repository.listJournal(userId, {
+          from: '2026-03-10',
+          to: '2026-03-20',
+        });
+        expect(journal).toHaveLength(1);
+        expect(journal[0]).toMatchObject({
+          localDate: DAY,
+          framing: { inMyControl: 'Starting on time.', virtue: 'courage' },
+          review: { learned: 'Mornings are when I write.' },
+        });
+        // Saving a review without the new field leaves it alone.
+        await repository.saveDayReview(userId, {
+          localDate: DAY,
+          timeZone: ZONE,
+          wentWell: 'Started on time.',
+          friction: null,
+          tomorrowOneThing: null,
+          energy: 'steady',
+          metMinimum: null,
+        });
+        expect((await repository.getDayReview(userId, DAY))?.learned).toBe(
+          'Mornings are when I write.',
+        );
+      });
+
+      it('saves a weekly review per prompt, and a blank answer removes it', async () => {
+        const { repository, userId } = await fresh();
+        await repository.saveWeeklyReview(userId, {
+          weekStart: START,
+          timeZone: ZONE,
+          answers: { noticed: 'Mornings went well.', next: 'Keep the walk.' },
+        });
+        expect(await repository.getWeeklyReview(userId, START)).toEqual({
+          noticed: 'Mornings went well.',
+          next: 'Keep the walk.',
+        });
+        await repository.saveWeeklyReview(userId, {
+          weekStart: START,
+          timeZone: ZONE,
+          answers: { noticed: '', control: 'Worried about the weather.' },
+        });
+        expect(await repository.getWeeklyReview(userId, START)).toEqual({
+          control: 'Worried about the weather.',
+          next: 'Keep the walk.',
+        });
+        expect(await repository.getWeeklyReview(userId, '2026-03-09')).toEqual({});
+      });
+
+      it('screens for contrast therapy, records sessions once, and turns off completely', async () => {
+        const { repository, userId } = await fresh();
+        expect(await repository.getContrastScreening(userId)).toBeNull();
+        expect(await repository.getSafetyAcknowledgement(userId, 'contrast_therapy')).toBeNull();
+        const answers = Object.fromEntries(
+          CONTRAST_SCREENING_QUESTIONS.map((question) => [question.id, false]),
+        ) as ContrastScreening['answers'];
+        await repository.saveContrastScreening(userId, { answers, clinicianCleared: false });
+        await repository.acknowledgeSafety(userId, {
+          topic: 'contrast_therapy',
+          version: CONTRAST_NOTICE_VERSION,
+          at: new Date('2026-03-16T08:00:00Z'),
+        });
+        expect(await repository.getSafetyAcknowledgement(userId, 'contrast_therapy')).toBe(
+          CONTRAST_NOTICE_VERSION,
+        );
+        const session = {
+          localDate: DAY,
+          timeZone: ZONE,
+          protocol: GENTLE_PROTOCOL,
+          phasesCompleted: 2,
+          status: 'stopped' as const,
+          stopReason: 'too_cold' as const,
+          startedAt: '2026-03-16T18:00:00.000Z',
+          endedAt: '2026-03-16T18:05:00.000Z',
+          clientToken: 'contrast-1',
+        };
+        const first = await repository.recordContrastSession(userId, session);
+        const again = await repository.recordContrastSession(userId, session);
+        expect(again.id).toBe(first.id);
+        expect(await repository.listContrastSessions(userId, { from: DAY, to: DAY })).toHaveLength(
+          1,
+        );
+
+        await repository.disableContrast(userId);
+        expect(await repository.getContrastScreening(userId)).toBeNull();
+        expect(await repository.getSafetyAcknowledgement(userId, 'contrast_therapy')).toBeNull();
+        await repository.deleteContrastSessions(userId);
+        expect(await repository.listContrastSessions(userId, { from: DAY, to: DAY })).toEqual([]);
       });
     });
 

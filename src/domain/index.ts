@@ -20,6 +20,7 @@ export {
   toLocalDate,
   weekdayOf,
   zonedTimeToInstant,
+  formatLocalDate,
 } from './local-day';
 export {
   describeRecurrence,
@@ -204,3 +205,6 @@ export * from './workout-session';
 // (Frame, Limb, Cue) are too generic to put into the shared namespace.
 export * from './flexibility';
 export * from './nutrition';
+export * from './reset-program';
+export * from './contrast';
+export * from './journal';

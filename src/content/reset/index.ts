@@ -2,28 +2,22 @@ import { resetProgramSchema, type ResetProgram } from '../schema';
 import raw from './reset-66-day.json';
 
 /**
- * The 66-Day Reset.
+ * The source's day-by-day reset data, kept as extracted.
  *
  * The source PDF is titled "60-Day Reset" and contains 66 numbered days. That
- * discrepancy is not silently resolved anywhere in this app: the pack ships as
- * 66 days, carries the note explaining why, and a 60-day variant is offered
- * explicitly rather than by quietly truncating.
- *
- * Every value in this pack is a *default*, not a prescription. Wake times,
- * hydration targets, run distances, push-up counts and social caps are all
- * user-editable before a program starts and while it runs. Cold exposure is
- * opt-in and off by default. See docs/SOURCE_MAP.md §1.
+ * discrepancy is not silently resolved: ARETE's programme
+ * (`domain/reset-program.ts`) runs sixty days, its title's number, and offers
+ * days 61–66 as an optional extension week the person can add before starting
+ * or at the finish (SOURCE_MAP §1). These rows are the reference shown beside
+ * ARETE's ranges in the preview — never prescriptions in themselves. Every
+ * target ARETE suggests is an editable range worked out from the person.
  */
-export const resetProgram: ResetProgram = resetProgramSchema.parse(raw);
+export const resetSource: ResetProgram = resetProgramSchema.parse(raw);
 
-/** Days 1-60 only, for users who want the program its title advertises. */
-export function truncatedTo60(program: ResetProgram = resetProgram): ResetProgram {
-  return {
-    ...program,
-    id: `${program.id}-60`,
-    title: '60-Day Reset (truncated)',
-    days: program.days.filter((day) => day.day <= 60),
-  };
-}
+/** Days 1–60: the programme proper. */
+export const resetMainDays = resetSource.days.filter((day) => day.day <= 60);
+
+/** Days 61–66: the optional extension week. */
+export const resetExtensionDays = resetSource.days.filter((day) => day.day > 60);
 
 export type { ResetProgram, ResetDay } from '../schema';

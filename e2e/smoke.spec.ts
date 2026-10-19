@@ -436,12 +436,12 @@ test.describe.serial('the day loop', () => {
     await expect(async () => {
       const opener = page.getByRole('button', { name: 'Write the review' });
       if ((await opener.count()) > 0) await opener.click();
-      await expect(page.getByLabel('What went well?')).toBeVisible({ timeout: 1000 });
+      await expect(page.getByLabel('What did I do well?')).toBeVisible({ timeout: 1000 });
     }).toPass({ timeout: 15_000 });
 
     const note = `Started early ${test.info().project.name}`;
-    await page.getByLabel('What went well?').fill(note);
-    await page.getByLabel('One thing for tomorrow').fill('Finish the draft');
+    await page.getByLabel('What did I do well?').fill(note);
+    await page.getByLabel('One adjustment for tomorrow').fill('Finish the draft');
     // "Save" the first time, "Update" once a review exists for the day.
     await page.getByRole('button', { name: /(save|update) the review/i }).click();
 
@@ -450,7 +450,7 @@ test.describe.serial('the day loop', () => {
     await expect(page.getByText('Review saved.')).toBeVisible();
 
     await page.reload();
-    await expect(page.getByLabel('What went well?')).toHaveValue(note);
+    await expect(page.getByLabel('What did I do well?')).toHaveValue(note);
   });
 });
 

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { getCurrentUser } from '@/auth';
-import { addDays, type CommitmentKind } from '@/domain';
+import { VIRTUES, addDays, type CommitmentKind, type Virtue } from '@/domain';
 import { withUser } from '@/persistence';
 import type { AreteRepository, DayReview } from '@/persistence/repository';
 import { resolveCurrentDay } from '../current-day';
@@ -41,7 +41,16 @@ export async function setFramingAction(input: {
   intention?: string | null;
   inMyControl?: string | null;
   notMyControl?: string | null;
+  virtue?: Virtue | null;
+  obstacle?: string | null;
 }): Promise<void> {
+  if (
+    input.virtue !== undefined &&
+    input.virtue !== null &&
+    !VIRTUES.some((v) => v.value === input.virtue)
+  ) {
+    throw new Error('Unknown quality.');
+  }
   await onToday((repository, { userId, localDate, timeZone }) =>
     repository.setFraming(userId, { localDate, timeZone, ...input }),
   );

@@ -1,5 +1,6 @@
 import {
   RANGE_STATUS_LABEL,
+  formatLocalDate,
   formatFoodMass,
   formatVolume,
   rangeStatus,
@@ -69,25 +70,15 @@ export function servingWeight(grams: number | null, system: UnitSystem): string 
 
 export function dayName(iso: string, today: string): string {
   if (iso === today) return 'Today';
-  const date = new Date(`${iso}T12:00:00Z`);
   const yesterday = new Date(Date.parse(`${today}T12:00:00Z`) - 86_400_000)
     .toISOString()
     .slice(0, 10);
   if (iso === yesterday) return 'Yesterday';
-  return date.toLocaleDateString('en-GB', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'short',
-    timeZone: 'UTC',
-  });
+  return formatLocalDate(iso, 'long');
 }
 
 export function shortDay(iso: string): string {
-  return new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-GB', {
-    weekday: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  });
+  return formatLocalDate(iso, 'day');
 }
 
 /** A number field's value, or null when left blank. */

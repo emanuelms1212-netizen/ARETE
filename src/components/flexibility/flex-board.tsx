@@ -19,6 +19,7 @@ import {
   PAIN_RULE,
   WEEKDAY_NAMES,
   WEEKDAY_SHORT,
+  formatLocalDate,
   checkinNeedsGuidance,
   compareCheckins,
   mondayFirst,
@@ -96,7 +97,7 @@ const dayChoices = WEEK.map((day) => ({ value: String(day), label: WEEKDAY_SHORT
 function formatDate(iso: string, today: string): string {
   if (iso === today) return 'today';
   const date = new Date(`${iso}T12:00:00Z`);
-  return `${WEEKDAY_NAMES[date.getUTCDay()]} ${date.getUTCDate()} ${date.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' })}`;
+  return `${WEEKDAY_NAMES[date.getUTCDay()]} ${formatLocalDate(iso, 'short').split(' ').slice(1).join(' ')}`;
 }
 
 function Provenance({

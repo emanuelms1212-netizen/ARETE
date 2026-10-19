@@ -18,9 +18,13 @@ Titled **"60-Day Reset – Calm and Sleek"**. Contains **66 numbered days**.
 The document's title says 60 days. The day-by-day content runs Day 1 → Day 66, and the
 final page's recommendation reads "Gentle deload after Day 66."
 
-**Decision:** the app ships the template as **"66-Day Reset"** with an explicit note that
-the source PDF was titled "60-Day". Importing only Days 1–60 is offered as a variant
-("60-Day Reset (truncated)"). The app must never render a 60-day title over 66 days of content.
+**Decision (revised in stage 11, ledger D96):** ARETE runs a **60-day programme** — the
+number in the source's title — and offers the source's **days 61–66 as an optional
+"extension week"**, off by default, which the person can add before starting or at the finish.
+Nothing beyond day 60 is imported silently, and the screen says, in one line, that the PDF is
+titled 60 days but runs 66. (Stages 1–10 planned to ship it as "66-Day Reset" with a 60-day
+truncation; Prompt 11 asked for the extension-week treatment instead, and it is the clearer one.)
+The app must never render a 60-day title over 66 days of content.
 
 ### Structure (extracted, machine-readable)
 
@@ -51,6 +55,14 @@ meditation 5 → 25 min; reading 10 → 30 pages.
   and with any user who works nights.
 - **Cold shower is a near-daily checkbox** with no screening, no opt-out, no contraindications.
 - **Social media is driven to 0 m** — presented as virtue rather than a user choice.
+
+**As built (stage 11):** `domain/reset-program.ts` keeps the source's components and its five
+blocks (renamed Foundation, Build, Steady, Stretch, Consolidate) and replaces every number with
+a suggested range worked out from the person: water from body weight and climate (30–35 ml/kg,
+capped at 3.5 L, never the source's 4 L), movement from the session length they gave Train
+(capped at 90 minutes, gentler with a pain flag or as a beginner), study scaled down for busy
+weekdays, meditation from their stated experience, a wake window only around a time they chose,
+and 7–9 hours' sleep. The source's own numbers are shown beside each block, for reference.
 
 **Product consequence:** the reset is an _optional, editable program template_. Every parameter
 (wake, water, run distance, push-up count, gym duration, meditation length, social cap,
@@ -127,6 +139,15 @@ medical advice, recommends never doing cold immersion alone, and offers conserva
 ("heat-shock proteins", "growth hormone", "reduce inflammation") are **mechanistic claims
 presented without citation** — restate them as "commonly cited rationale", never as effects
 the app promises.
+
+**As built (stage 11, ledger D100–D102):** Programmes → Contrast therapy. Off until the person
+answers an eight-question screening (pre-ticked from onboarding where it already knows) and
+acknowledges a versioned safety notice. Any yes means "talk to a doctor first", and the timer
+stays off unless they say a doctor has cleared them; under 18 it is not offered at all. The
+default protocol is 3 minutes' heat, 30 seconds' cool, two rounds, finishing warm — below both
+source protocols, which are shown for reference with their rationale labelled as commonly cited.
+"Stop now" is on screen throughout; stopping for dizziness says to sit down and seek help. No
+session counts towards a streak or a reset day. Turning it off deletes the screening.
 
 ---
 
@@ -245,7 +266,7 @@ offers a regression for every movement, and never counts a skipped movement as f
 
 | Question       | Sources disagree                                                                       | ARETE's resolution                                                                              |
 | -------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Program length | 60 days (title) vs 66 days (content) vs 10 weeks (pamphlet) vs 8 weeks (regimen)       | Ship "66-Day Reset", labelled; offer 60-day truncation; all lengths user-editable               |
+| Program length | 60 days (title) vs 66 days (content) vs 10 weeks (pamphlet) vs 8 weeks (regimen)       | 60 days, with days 61–66 as an optional extension week, stated on screen (D96)                  |
 | Wake time      | 07:00 (#1, #2) vs 06:00 (#3, and #1 from day 43)                                       | No default wake time is imposed. Asked at onboarding, changeable, never a streak condition      |
 | Hydration      | 2 L → 4 L (#1) vs "hydrate" (#2)                                                       | Suggested range with a conservative default; user-set; no escalation ramp by default            |
 | Cold exposure  | Daily cold shower (#1, #2), plunge + sauna (#3), full contrast protocols (#4)          | One opt-in module, off by default, safety-screened, conservative defaults                       |
@@ -257,7 +278,7 @@ offers a regression for every movement, and never counts a skipped movement as f
 
 | Source            | Ship verbatim?                 | Ship structure?      | Notes                                                                      |
 | ----------------- | ------------------------------ | -------------------- | -------------------------------------------------------------------------- |
-| 66-Day Reset      | No (user's own, but restated)  | **Yes**              | Flagship optional program; every parameter editable                        |
+| 60-Day Reset      | No (user's own, but restated)  | **Yes**              | 60 days + optional extension week; every target an editable range          |
 | Reset pamphlet    | No                             | Yes                  | Merged into the above                                                      |
 | Teen regimen      | No                             | Partial              | PPL 4-phase shape only                                                     |
 | Contrast therapy  | No                             | Yes, opt-in          | Safety gate mandatory; conservative defaults                               |
