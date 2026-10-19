@@ -190,3 +190,9 @@ export {
   resumeMindPatch,
 } from './mind';
 export type { MindKind, MindSession, MindStage, PlayerView } from './mind';
+export * from './exercise';
+export * from './workout-plan';
+export * from './progression';
+export * from './workout-session';
+// The mannequin is imported from '@/domain/mannequin' directly: its names
+// (Frame, Limb, Cue) are too generic to put into the shared namespace.

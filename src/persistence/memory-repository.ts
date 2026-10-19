@@ -14,6 +14,8 @@ import {
 import { demoDays, demoSeed, type DemoSeed } from './demo-data';
 import { createMemoryDailySystem } from './memory/daily-system';
 import { createMemoryMind } from './memory/mind';
+import { createMemoryTrain } from './memory/train';
+import { demoTraining } from './demo-training';
 import {
   RecordNotFoundError,
   type AccountExport,
@@ -103,6 +105,25 @@ export function createMemoryRepository(
   // Meditation, breathwork and cognitive practice.
   const mind = createMemoryMind();
 
+  // Training. Saving a Train setup also updates onboarding's training answers,
+  // as the SQL adapter does by writing both to one row.
+  const { seedTrain, exportTrain, deleteTrain, ...train } = createMemoryTrain({
+    onSetupSaved: (userId, setup) => {
+      const record = onboardingFor(userId);
+      const previous = (record.answers['training'] ?? {}) as Record<string, unknown>;
+      record.answers = {
+        ...record.answers,
+        training: {
+          ...previous,
+          experience: setup.experience,
+          equipment: setup.equipment,
+          sessionMinutes: Math.max(5, setup.sessionMinutes),
+        },
+      };
+    },
+  });
+  if (planSeed !== null) seedTrain(seedUserId, demoTraining());
+
   function onboardingFor(userId: string): OnboardingRecord {
     let record = state.onboarding.get(userId);
     if (!record) {
@@ -154,6 +175,7 @@ export function createMemoryRepository(
     kind: 'memory',
     ...daily,
     ...mind,
+    ...train,
 
     async getOnboarding(userId: string) {
       return onboardingState(userId);
@@ -330,7 +352,7 @@ export function createMemoryRepository(
         exportedAt: new Date(0).toISOString(),
         schemaVersion: 10,
         profile: { id: userId, mode: 'demo' },
-        tables: { daily_plans: days, focus_sessions: focus },
+        tables: { daily_plans: days, focus_sessions: focus, ...exportTrain(userId) },
       };
     },
 
@@ -341,6 +363,7 @@ export function createMemoryRepository(
       for (const mapKey of [...state.focus.keys()]) {
         if (mapKey.startsWith(`${userId}::`)) state.focus.delete(mapKey);
       }
+      deleteTrain(userId);
     },
   };
 }

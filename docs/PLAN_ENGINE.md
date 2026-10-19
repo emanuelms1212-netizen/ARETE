@@ -144,3 +144,30 @@ an answer is interpreted does not require re-asking the question.
 - **No repositories for `habits`, `habit_schedules` or `tasks`.** The draft's habits are
   stored on the draft; turning them into recurring schedules arrives with the screens that
   manage them.
+
+## The training plan (stage 8)
+
+The first-week generator above decides _that_ there is a training session on a day. The Train
+plan engine (`src/domain/workout-plan.ts`) decides _what is in it_, from the setup saved on the
+Train screen. It is pure and deterministic, and nothing it produces is stored (ledger D65).
+
+1. **Shape.** The goal and the number of days (2–6) pick a template — full-body A/B/C,
+   upper/lower, runs with strength, or strength with court conditioning. Someone new gets at
+   most three hard sessions; the rest become easy movement.
+2. **Arrangement.** With tennis days, every ordering of the week is scored and the lowest
+   penalty wins: leg-heavy sessions the day before or the day of a match cost most, back-to-
+   back leg days cost a little. Ties keep the template order.
+3. **Exercises.** Each slot names movement patterns with fallbacks ("a pull-down, else a
+   row"). The library is filtered by equipment, severe flags and the avoid list; difficulty
+   targets experience (accessories one step lower); a sore region gets the easiest variant.
+   A pattern nothing can fill is left out and listed under "Why this plan".
+4. **Dosage.** Sets, reps or time, rest and RPE come from goal, experience and role. Warm-up
+   and cool-down are fixed. Nothing logged in two weeks takes a set off.
+5. **Fit.** Sessions are trimmed to the minutes available — accessory sets, then accessories,
+   then a primary set, then the second cool-down and warm-up items. The first main exercise
+   never goes. The minimum version is the first warm-up item and the first main exercise.
+
+At the start of a workout, `buildWorkout` adapts the session to readiness (low: a set fewer,
+one RPE easier; high: unchanged) and runs `decideProgression` per exercise against the logged
+history. The result is snapshotted on the workout (D66). The progression rules are in
+`src/domain/progression.ts` and summarised in ledger D67.

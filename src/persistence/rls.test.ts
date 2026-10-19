@@ -345,3 +345,84 @@ describe('the schema enforces the product rules it can', () => {
     ).rejects.toThrow(/workout_exercise_reps_or_time/);
   });
 });
+
+describe('workouts', () => {
+  let theirWorkout: string;
+  let exerciseId: string;
+
+  beforeAll(async () => {
+    await database.asOwner();
+    const exercise = await database.db.query<{ id: string }>(
+      `insert into public.exercises (user_id, slug, name) values (null, 'rls-squat', 'Squat')
+       on conflict (slug) where user_id is null do update set name = excluded.name
+       returning id`,
+    );
+    exerciseId = exercise.rows[0]!.id;
+    const workout = await database.db.query<{ id: string }>(
+      `insert into public.workout_sessions (user_id, local_date, timezone, session_key, title_snapshot, snapshot)
+       values ($1, '2026-03-16', 'UTC', '1-full_a', 'Full body A', '{}'::jsonb) returning id`,
+      [USER_B],
+    );
+    theirWorkout = workout.rows[0]!.id;
+  });
+
+  it("cannot see another person's workout", async () => {
+    await database.asUser(USER_A);
+    expect(
+      await rows(`select * from public.workout_sessions where id = $1`, [theirWorkout]),
+    ).toEqual([]);
+  });
+
+  it("cannot log a set against another person's workout, even under its own name", async () => {
+    // RLS passes — the row says it is A's — and the foreign key passes, because
+    // it is checked with the owner's rights. The trigger is what refuses it.
+    await database.asUser(USER_A);
+    await expect(
+      database.db.query(
+        `insert into public.workout_logs
+           (user_id, workout_session_id, exercise_id, exercise_slug, exercise_name_snapshot,
+            local_date, timezone, set_index, reps)
+         values ($1, $2, $3, 'rls-squat', 'Squat', '2026-03-16', 'UTC', 1, 10)`,
+        [USER_A, theirWorkout, exerciseId],
+      ),
+    ).rejects.toThrow(/does not belong to this user/);
+  });
+
+  it('allows only one running workout per person', async () => {
+    await database.asOwner();
+    await expect(
+      database.db.query(
+        `insert into public.workout_sessions (user_id, local_date, timezone, session_key, title_snapshot, snapshot)
+         values ($1, '2026-03-17', 'UTC', '2-full_b', 'Full body B', '{}'::jsonb)`,
+        [USER_B],
+      ),
+    ).rejects.toThrow(/workout_sessions_one_running/);
+  });
+
+  it('refuses pain outside 0–10 and a finished workout with no end time', async () => {
+    await database.asOwner();
+    await expect(
+      database.db.query(
+        `insert into public.workout_logs
+           (user_id, workout_session_id, exercise_id, exercise_slug, exercise_name_snapshot,
+            local_date, timezone, set_index, reps, pain)
+         values ($1, $2, $3, 'rls-squat', 'Squat', '2026-03-16', 'UTC', 1, 10, 11)`,
+        [USER_B, theirWorkout, exerciseId],
+      ),
+    ).rejects.toThrow(/workout_log_pain_range/);
+    await expect(
+      database.db.query(`update public.workout_sessions set status = 'completed' where id = $1`, [
+        theirWorkout,
+      ]),
+    ).rejects.toThrow(/workout_session_end_matches_status/);
+  });
+
+  it('keeps library exercise slugs unique', async () => {
+    await database.asOwner();
+    await expect(
+      database.db.query(
+        `insert into public.exercises (user_id, slug, name) values (null, 'rls-squat', 'Again')`,
+      ),
+    ).rejects.toThrow(/exercises_library_slug/);
+  });
+});

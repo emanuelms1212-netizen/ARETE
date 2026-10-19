@@ -598,7 +598,96 @@ travel; and the three Today metrics wrapped 2-then-1, so they became a three-col
 - [ ] **Migrations applied to a hosted database** — still no Supabase project.
 - [ ] The journal, which the Mind screen will eventually hold alongside these.
 
-## Stages 8–17 — not started
+## Stage 8 — Train: strength, cardio and the animation framework
 
-Tracked in `docs/PROJECT_LEDGER.md` §8. No item below stage 8 may be ticked before the
+### The plan engine
+
+- [x] Inputs: goal, experience, equipment, available days, session length, preferred
+      activities, pain flags, readiness, recent volume and exercises to avoid
+- [x] Two to six training days; the schema refuses one and refuses seven, with the reason
+- [x] Home, bodyweight and gym variants come from one library filtered by equipment
+- [x] Strength, general fitness, running and tennis-ready goals each have their own week
+- [x] **Tennis-compatible scheduling:** leg-heavy sessions kept off the day before and the
+      day of a match, by scoring every ordering of the week (D70)
+- [x] Every session has a warm-up, main work, accessories, a cool-down, an estimated
+      duration, rest periods, sets and reps or time, an RPE and RIR target, substitutions, and
+      a minimum version
+- [x] Sessions fit the time available; accessories are trimmed before main work, and the first
+      main exercise is never dropped
+- [x] Someone new gets at most three hard sessions a week, however many days they pick
+- [x] Severe pain flags remove every exercise that loads the region, substitutes included;
+      mild and moderate pick the easiest variant and say why (D68)
+- [x] Nothing logged in two weeks takes a set off everything until training resumes
+- [x] Low readiness takes a set off and lowers the effort; high readiness adds nothing
+- [x] **Fixture users receive different plans that fit their calendar and equipment** — six
+      fixtures, each checked for days, equipment, flags, duration, structure and
+      determinism, and checked to differ from one another
+- [x] Every rule that shaped the week is shown in words under "Why this plan"
+
+### Progression
+
+- [x] Load rises only at the top of the range, at or under target effort, with form held (D67)
+- [x] Reps rise one at a time before load does
+- [x] Pain ≥ 4/10 makes the next session lighter and names the easier option; any pain holds
+- [x] Two very hard sessions with falling reps trigger a deload
+- [x] Holds and runs grow by at most 10% (and at least 5 s for a hold)
+- [x] **Deterministic and tested** — every rule has a test, and the same history always gives
+      the same answer
+- [x] Each target carries the sentence that explains it, shown beside the exercise
+
+### Logging
+
+- [x] Sets, load, reps, time, RPE, pain, form and completion, validated on both sides
+- [x] Logging the same set again corrects it rather than duplicating it
+- [x] Pain at 4 or more says to stop the exercise, and the card stops offering more sets
+- [x] Rest timer derived from when the last set was logged; survives a reload; skippable
+- [x] Substitution keeps the movement pattern and is refused otherwise (D69)
+- [x] **Workouts can be completed end to end** — started, logged, reloaded, swapped,
+      finished, and in the history afterwards — in a real browser
+- [x] Finishing completes the day's training commitment on Today (D74)
+- [x] One running workout per person, and a retried start is the same workout
+- [x] A set cannot be attached to someone else's workout, even with its id (D75)
+
+### The animation framework
+
+- [x] An articulated SVG mannequin, drawn from data; no video, no GIF, nothing traced
+- [x] Keyframes store view, duration, joint angles and positions, easing, loop points and
+      captioned coaching cues
+- [x] Planted feet and hands are solved by inverse kinematics, so they stay planted (D71)
+- [x] Play and pause, 0.5× and 1×, scrub and restart, side and front view where drawn,
+      highlighted joints and muscles, captioned steps
+- [x] Reduced motion shows a captioned still sequence, and anyone can choose it (D73)
+- [x] Nine validated animations: squat, push-up, lunge, plank, glute bridge, single-leg RDL,
+      good morning, leg swing and elephant walk — each held to a generic validator and to
+      checks of what the movement should look like (heels down, no hip sag, back knee near
+      the floor, trunk and leg in one line…)
+- [x] Labelled as an instructional aid, not a personalised form assessment
+- [x] Common mistakes and stop conditions in text beside every animation
+- [x] **Every exercise has a text fallback** — 50 exercises, each with steps, cues, mistakes
+      and stop conditions, asserted by test; un-animated ones say so
+- [x] **Smooth on a mid-range phone** — at 4× CPU throttling the player held 60 frames a
+      second with a p95 frame gap of 16.7 ms, asserted end to end (D72)
+
+### Verification
+
+- [x] `npm test` — **926** unit, component and database tests
+- [x] `npm run e2e` — **122** end-to-end tests (4 skipped by design, D76), three consecutive
+      clean runs, one of them against a freshly started server
+- [x] Format, lint, typecheck and build all clean
+- [x] Screenshots captured and inspected at 390×844 and 1440×900 — Train, setup, a running
+      workout, the exercise page, the still sequence, and all nine animations
+
+### Not done, and why
+
+- [ ] **Distance-based prescriptions** — runs are prescribed by time; the schema records
+      distance, but nothing prescribes it yet.
+- [ ] **Pounds** — loads are kilograms only; the unit preference is stored but not applied here.
+- [ ] **Planned deload weeks and multi-week periodisation** — deloads are reactive (D67).
+- [ ] **A professional review of the animations** — they pass kinematic and form checks, but
+      a coach or physiotherapist should look at each before launch.
+- [ ] **Migrations applied to a hosted database** — still no Supabase project.
+
+## Stages 9–17 — not started
+
+Tracked in `docs/PROJECT_LEDGER.md` §8. No item below stage 9 may be ticked before the
 stage that builds it has run and been verified.

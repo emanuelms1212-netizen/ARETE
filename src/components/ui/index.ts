@@ -18,3 +18,4 @@ export { Skeleton, SkeletonText } from './skeleton';
 export { EmptyState, ErrorState, StateBlock } from './state-block';
 export { TimerRing } from './timer-ring';
 export { ToastProvider, useToast } from './toast';
+export { useReducedMotion } from './use-reduced-motion';

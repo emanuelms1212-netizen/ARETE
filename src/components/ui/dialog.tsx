@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { CloseIcon } from '@/components/icons';
 import { Button } from './button';
 
@@ -23,6 +23,9 @@ export interface DialogProps {
  */
 export function Dialog({ open, onClose, title, description, children, footer }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
+  // One id per dialog: a page with two dialogs must not have two elements
+  // claiming to be the same title.
+  const titleId = useId();
 
   useEffect(() => {
     const dialog = ref.current;
@@ -47,12 +50,12 @@ export function Dialog({ open, onClose, title, description, children, footer }: 
         onClose();
       }}
       onClose={onClose}
-      aria-labelledby="dialog-title"
-      className="animate-sheet-in m-0 mt-auto w-full max-w-md rounded-t-xl border border-line bg-surface p-0 text-ink shadow-overlay backdrop:bg-black/40 sm:m-auto sm:rounded-xl"
+      aria-labelledby={titleId}
+      className="animate-sheet-in m-0 mt-auto w-full max-h-[92dvh] max-w-md overflow-y-auto rounded-t-xl border border-line bg-surface p-0 text-ink shadow-overlay backdrop:bg-black/40 sm:m-auto sm:rounded-xl"
     >
       <div className="px-safe pb-safe p-5">
         <div className="flex items-start justify-between gap-4">
-          <h2 id="dialog-title" className="font-display text-display-3 font-semibold text-ink">
+          <h2 id={titleId} className="font-display text-display-3 font-semibold text-ink">
             {title}
           </h2>
           <button

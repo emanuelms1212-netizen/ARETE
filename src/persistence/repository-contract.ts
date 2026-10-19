@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { generateFirstWeek } from '@/domain';
+import { EXERCISES } from '@/content/train/exercises';
+import {
+  buildWorkout,
+  generateFirstWeek,
+  generateTrainingPlan,
+  trainingSetupSchema,
+  type WorkoutSnapshot,
+} from '@/domain';
 import type { AreteRepository } from './repository';
 
 export interface ContractSubject {
@@ -1461,6 +1468,314 @@ export function describeRepositoryContract(
             at: new Date(),
             status: 'completed',
           }),
+        ).toBeNull();
+      });
+    });
+
+    describe('train', () => {
+      const SETUP = trainingSetupSchema.parse({
+        goal: 'general',
+        experience: 'consistent',
+        equipment: ['dumbbells'],
+        trainingWeekdays: [1, 3, 5],
+        sessionMinutes: 35,
+        painFlags: [{ region: 'knees', severity: 'mild' }],
+      });
+      const START = new Date('2026-03-16T07:00:00.000Z');
+
+      function snapshot(): WorkoutSnapshot {
+        const plan = generateTrainingPlan(SETUP, EXERCISES);
+        return buildWorkout({
+          session: plan.sessions[0]!,
+          readiness: 'normal',
+          minimumMode: false,
+          history: [],
+          library: EXERCISES,
+          availability: {
+            equipment: SETUP.equipment,
+            excludedRegions: [],
+            gentleRegions: [],
+            avoid: [],
+          },
+        });
+      }
+
+      const primarySlug = (shot: WorkoutSnapshot) =>
+        shot.items.find((item) => item.block === 'primary')!.exerciseSlug;
+
+      it('has no setup until one is saved, then returns exactly what was saved', async () => {
+        const { repository, userId } = await fresh();
+        expect(await repository.getTrainingSetup(userId)).toBeNull();
+        const saved = await repository.saveTrainingSetup(userId, SETUP, START);
+        expect(saved).toEqual(SETUP);
+        expect(await repository.getTrainingSetup(userId)).toEqual(SETUP);
+      });
+
+      it('keeps onboarding’s training answers in step with the setup', async () => {
+        const { repository, userId } = await fresh();
+        await repository.saveTrainingSetup(userId, { ...SETUP, sessionMinutes: 45 }, START);
+        const { profile } = await repository.getOnboarding(userId);
+        expect(profile.training.sessionMinutes).toBe(45);
+        expect(profile.training.equipment).toEqual(['dumbbells']);
+        expect(profile.training.experience).toBe('consistent');
+      });
+
+      it('starts a workout with its prescription, and a retry is the same workout', async () => {
+        const { repository, userId } = await fresh();
+        const shot = snapshot();
+        const input = {
+          localDate: DAY,
+          timeZone: ZONE,
+          snapshot: shot,
+          startedAt: START,
+          clientToken: 'w-1',
+        };
+        const first = await repository.startWorkout(userId, input);
+        const again = await repository.startWorkout(userId, input);
+        expect(again.id).toBe(first.id);
+        expect(first.status).toBe('running');
+        expect(first.snapshot).toEqual(shot);
+        expect((await repository.getRunningWorkout(userId))?.id).toBe(first.id);
+      });
+
+      it('refuses a second workout while one is running', async () => {
+        const { repository, userId } = await fresh();
+        const shot = snapshot();
+        await repository.startWorkout(userId, {
+          localDate: DAY,
+          timeZone: ZONE,
+          snapshot: shot,
+          startedAt: START,
+          clientToken: 'w-1',
+        });
+        await expect(
+          repository.startWorkout(userId, {
+            localDate: DAY,
+            timeZone: ZONE,
+            snapshot: shot,
+            startedAt: START,
+            clientToken: 'w-2',
+          }),
+        ).rejects.toThrow(/already running/);
+      });
+
+      it('logs sets, and logging the same set again corrects it', async () => {
+        const { repository, userId } = await fresh();
+        const shot = snapshot();
+        const workout = await repository.startWorkout(userId, {
+          localDate: DAY,
+          timeZone: ZONE,
+          snapshot: shot,
+          startedAt: START,
+          clientToken: 'w-1',
+        });
+        const slug = primarySlug(shot);
+        const base = {
+          workoutId: workout.id,
+          exerciseSlug: slug,
+          block: 'primary' as const,
+          loadKg: 14,
+          seconds: null,
+          distanceM: null,
+          completed: true,
+          formOk: true,
+          notes: null,
+          substitutedFrom: null,
+        };
+        await repository.logWorkoutSet(userId, {
+          ...base,
+          setIndex: 1,
+          reps: 10,
+          rpe: 7,
+          pain: 0,
+          at: new Date(START.getTime() + 60_000),
+        });
+        await repository.logWorkoutSet(userId, {
+          ...base,
+          setIndex: 2,
+          reps: 9,
+          rpe: 8,
+          pain: 0,
+          at: new Date(START.getTime() + 180_000),
+        });
+        const corrected = await repository.logWorkoutSet(userId, {
+          ...base,
+          setIndex: 2,
+          reps: 11,
+          rpe: 7.5,
+          pain: 1,
+          at: new Date(START.getTime() + 200_000),
+        });
+
+        expect(corrected.sets).toHaveLength(2);
+        const second = corrected.sets.find((set) => set.setIndex === 2)!;
+        expect(second.reps).toBe(11);
+        expect(second.rpe).toBe(7.5);
+        expect(second.pain).toBe(1);
+        expect(second.loadKg).toBe(14);
+        expect(second.formOk).toBe(true);
+      });
+
+      it('refuses a set for an exercise that is not in the workout, or nonsense values', async () => {
+        const { repository, userId } = await fresh();
+        const workout = await repository.startWorkout(userId, {
+          localDate: DAY,
+          timeZone: ZONE,
+          snapshot: snapshot(),
+          startedAt: START,
+          clientToken: 'w-1',
+        });
+        const set = {
+          workoutId: workout.id,
+          block: 'primary' as const,
+          setIndex: 1,
+          reps: 10,
+          loadKg: null,
+          seconds: null,
+          distanceM: null,
+          rpe: 7,
+          pain: 0,
+          completed: true,
+          formOk: null,
+          notes: null,
+          substitutedFrom: null,
+          at: START,
+        };
+        await expect(
+          repository.logWorkoutSet(userId, { ...set, exerciseSlug: 'pull-up' }),
+        ).rejects.toThrow(/not part of this workout/);
+        await expect(
+          repository.logWorkoutSet(userId, {
+            ...set,
+            exerciseSlug: primarySlug(workout.snapshot),
+            pain: 14,
+          }),
+        ).rejects.toThrow();
+      });
+
+      it('saves a substitution into the running workout', async () => {
+        const { repository, userId } = await fresh();
+        const shot = snapshot();
+        const workout = await repository.startWorkout(userId, {
+          localDate: DAY,
+          timeZone: ZONE,
+          snapshot: shot,
+          startedAt: START,
+          clientToken: 'w-1',
+        });
+        const changed: WorkoutSnapshot = {
+          ...shot,
+          items: shot.items.map((item, index) =>
+            index === 0
+              ? { ...item, exerciseSlug: 'arm-circles', substitutedFrom: item.exerciseSlug }
+              : item,
+          ),
+        };
+        const updated = await repository.updateWorkoutSnapshot(userId, workout.id, changed);
+        expect(updated.snapshot.items[0]?.exerciseSlug).toBe('arm-circles');
+        expect(
+          (await repository.getRunningWorkout(userId))?.snapshot.items[0]?.substitutedFrom,
+        ).toBe(shot.items[0]?.exerciseSlug);
+      });
+
+      it('finishes once, keeps the notes, and refuses sets afterwards', async () => {
+        const { repository, userId } = await fresh();
+        const shot = snapshot();
+        const workout = await repository.startWorkout(userId, {
+          localDate: DAY,
+          timeZone: ZONE,
+          snapshot: shot,
+          startedAt: START,
+          clientToken: 'w-1',
+        });
+        const end = new Date(START.getTime() + 30 * 60_000);
+        const done = await repository.finishWorkout(userId, {
+          workoutId: workout.id,
+          status: 'completed',
+          at: end,
+          notes: 'Felt strong.',
+        });
+        const twice = await repository.finishWorkout(userId, {
+          workoutId: workout.id,
+          status: 'abandoned',
+          at: new Date(),
+          notes: null,
+        });
+
+        expect(done.status).toBe('completed');
+        expect(done.endedAt).toBe(end.toISOString());
+        expect(twice.status).toBe('completed');
+        expect(twice.notes).toBe('Felt strong.');
+        expect(await repository.getRunningWorkout(userId)).toBeNull();
+        await expect(
+          repository.logWorkoutSet(userId, {
+            workoutId: workout.id,
+            exerciseSlug: primarySlug(shot),
+            block: 'primary',
+            setIndex: 1,
+            reps: 8,
+            loadKg: null,
+            seconds: null,
+            distanceM: null,
+            rpe: 7,
+            pain: 0,
+            completed: true,
+            formOk: null,
+            notes: null,
+            substitutedFrom: null,
+            at: end,
+          }),
+        ).rejects.toThrow(/already finished/);
+      });
+
+      it('lists workouts most recent first, with their sets', async () => {
+        const { repository, userId } = await fresh();
+        const shot = snapshot();
+        const first = await repository.startWorkout(userId, {
+          localDate: '2026-03-09',
+          timeZone: ZONE,
+          snapshot: shot,
+          startedAt: new Date('2026-03-09T07:00:00Z'),
+          clientToken: 'w-1',
+        });
+        await repository.logWorkoutSet(userId, {
+          workoutId: first.id,
+          exerciseSlug: primarySlug(shot),
+          block: 'primary',
+          setIndex: 1,
+          reps: 12,
+          loadKg: 16,
+          seconds: null,
+          distanceM: null,
+          rpe: 7,
+          pain: 0,
+          completed: true,
+          formOk: true,
+          notes: null,
+          substitutedFrom: null,
+          at: new Date('2026-03-09T07:05:00Z'),
+        });
+        await repository.finishWorkout(userId, {
+          workoutId: first.id,
+          status: 'completed',
+          at: new Date('2026-03-09T07:40:00Z'),
+          notes: null,
+        });
+        const second = await repository.startWorkout(userId, {
+          localDate: DAY,
+          timeZone: ZONE,
+          snapshot: shot,
+          startedAt: START,
+          clientToken: 'w-2',
+        });
+
+        const list = await repository.listWorkouts(userId);
+        expect(list.map((workout) => workout.id)).toEqual([second.id, first.id]);
+        expect(list[1]?.sets[0]?.loadKg).toBe(16);
+        expect(list[1]?.localDate).toBe('2026-03-09');
+        expect(await repository.getWorkout(userId, first.id)).not.toBeNull();
+        expect(
+          await repository.getWorkout(userId, '00000000-0000-4000-8000-00000000ffff'),
         ).toBeNull();
       });
     });

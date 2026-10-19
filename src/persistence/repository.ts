@@ -19,7 +19,7 @@ import type {
   OnboardingStep,
   Recurrence,
 } from '@/domain';
-import type { DrillItem } from '@/domain';
+import type { Block, DrillItem, TrainingSetup, WorkoutSession, WorkoutSnapshot } from '@/domain';
 
 /**
  * The persistence contract.
@@ -545,6 +545,73 @@ export interface MindRepository {
   ): Promise<readonly MindHistoryEntry[]>;
 }
 
+// ---------------------------------------------------------------------------
+// Train: the plan's inputs, and workouts as they are done
+// ---------------------------------------------------------------------------
+
+export interface StartWorkoutInput {
+  readonly localDate: IsoDate;
+  readonly timeZone: string;
+  readonly snapshot: WorkoutSnapshot;
+  readonly startedAt: Date;
+  /** Identifies this start attempt, so a retry of it is not a second workout. */
+  readonly clientToken: string;
+}
+
+export interface LogWorkoutSetInput {
+  readonly workoutId: string;
+  readonly exerciseSlug: string;
+  readonly block: Block;
+  readonly setIndex: number;
+  readonly reps: number | null;
+  readonly loadKg: number | null;
+  readonly seconds: number | null;
+  readonly distanceM: number | null;
+  readonly rpe: number | null;
+  readonly pain: number | null;
+  readonly completed: boolean;
+  readonly formOk: boolean | null;
+  readonly notes: string | null;
+  readonly substitutedFrom: string | null;
+  readonly at: Date;
+}
+
+export interface FinishWorkoutInput {
+  readonly workoutId: string;
+  readonly status: 'completed' | 'abandoned';
+  readonly at: Date;
+  readonly notes: string | null;
+}
+
+export interface TrainRepository {
+  /** Null until the person has saved a Train setup. */
+  getTrainingSetup(userId: string): Promise<TrainingSetup | null>;
+  saveTrainingSetup(userId: string, setup: TrainingSetup, at: Date): Promise<TrainingSetup>;
+
+  /**
+   * Starts a workout. One may run at a time: starting a second is refused,
+   * except that repeating the same start (same client token) returns the
+   * workout it already created.
+   */
+  startWorkout(userId: string, input: StartWorkoutInput): Promise<WorkoutSession>;
+  getRunningWorkout(userId: string): Promise<WorkoutSession | null>;
+  /** Replaces the prescription of a running workout — how a substitution is saved. */
+  updateWorkoutSnapshot(
+    userId: string,
+    workoutId: string,
+    snapshot: WorkoutSnapshot,
+  ): Promise<WorkoutSession>;
+  /** Logs one set. Logging the same set again corrects it. Running workouts only. */
+  logWorkoutSet(userId: string, input: LogWorkoutSetInput): Promise<WorkoutSession>;
+  finishWorkout(userId: string, input: FinishWorkoutInput): Promise<WorkoutSession>;
+  /** Most recent first, sets included. */
+  listWorkouts(
+    userId: string,
+    options?: { readonly limit?: number },
+  ): Promise<readonly WorkoutSession[]>;
+  getWorkout(userId: string, workoutId: string): Promise<WorkoutSession | null>;
+}
+
 export interface AccountRepository {
   /** Everything the account holds, as one document. Immediate, no queue. */
   exportEverything(userId: string): Promise<AccountExport>;
@@ -561,6 +628,7 @@ export interface AreteRepository
     TaskRepository,
     HabitRepository,
     MindRepository,
+    TrainRepository,
     FocusSessionRepository,
     AccountRepository {
   readonly kind: 'memory' | 'sql';

@@ -21,6 +21,7 @@ import {
 } from './repository';
 import { createSqlDailySystem } from './sql/daily-system';
 import { createSqlMind } from './sql/mind';
+import { createSqlTrain } from './sql/train';
 import type { SqlExecutor } from './sql-executor';
 
 interface PlanRow {
@@ -135,6 +136,7 @@ export function createSqlRepository(executor: SqlExecutor): AreteRepository {
 
   // Meditation, breathwork and cognitive practice.
   const mind = createSqlMind(executor);
+  const train = createSqlTrain(executor);
 
   // ---------------------------------------------------------------------
   // Onboarding
@@ -347,6 +349,7 @@ export function createSqlRepository(executor: SqlExecutor): AreteRepository {
     kind: 'sql',
     ...daily,
     ...mind,
+    ...train,
 
     async getOnboarding(userId: string) {
       return loadOnboarding(userId);

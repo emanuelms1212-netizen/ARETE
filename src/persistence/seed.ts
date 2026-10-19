@@ -1,4 +1,5 @@
 import { ALL_PRACTICES } from '@/content/mind/practices';
+import { EXERCISES } from '@/content/train/exercises';
 import type { SqlExecutor } from './sql-executor';
 import { DEMO_USER_ID, demoDays } from './demo-data';
 
@@ -203,6 +204,52 @@ async function seedMindPractices(executor: SqlExecutor): Promise<void> {
   }
 }
 
+/**
+ * The exercise library, with its instruction text.
+ *
+ * Library rows are the ones with no owner. Their slugs are unique among
+ * themselves (a partial index from 0014), which is what the upsert targets —
+ * a person's own exercise may reuse a slug without colliding with ARETE's.
+ */
+async function seedExercises(executor: SqlExecutor): Promise<void> {
+  for (const exercise of EXERCISES) {
+    await executor.query(
+      `insert into public.exercises
+         (user_id, slug, name, cue, equipment, loads_regions, pattern, measure, difficulty,
+          per_side, loadable, increment_kg, requires, steps, cues, mistakes, stop_if, animation_slug)
+       values (null, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+               $13::jsonb, $14::jsonb, $15::jsonb, $16::jsonb, $17)
+       on conflict (slug) where user_id is null do update set
+         name = excluded.name, cue = excluded.cue, equipment = excluded.equipment,
+         loads_regions = excluded.loads_regions, pattern = excluded.pattern,
+         measure = excluded.measure, difficulty = excluded.difficulty,
+         per_side = excluded.per_side, loadable = excluded.loadable,
+         increment_kg = excluded.increment_kg, requires = excluded.requires,
+         steps = excluded.steps, cues = excluded.cues, mistakes = excluded.mistakes,
+         stop_if = excluded.stop_if, animation_slug = excluded.animation_slug`,
+      [
+        exercise.slug,
+        exercise.name,
+        exercise.cues[0] ?? null,
+        exercise.requires.length === 0 ? 'none' : exercise.requires.join(','),
+        exercise.loads,
+        exercise.pattern,
+        exercise.measure,
+        exercise.difficulty,
+        exercise.perSide,
+        exercise.loadable,
+        exercise.incrementKg,
+        exercise.requires,
+        JSON.stringify(exercise.steps),
+        JSON.stringify(exercise.cues),
+        JSON.stringify(exercise.mistakes),
+        JSON.stringify(exercise.stopIf),
+        exercise.animation,
+      ],
+    );
+  }
+}
+
 export async function seedContent(executor: SqlExecutor): Promise<void> {
   for (const source of CONTENT_SOURCES) {
     await executor.query(
@@ -266,6 +313,7 @@ export async function seedContent(executor: SqlExecutor): Promise<void> {
   );
 
   await seedMindPractices(executor);
+  await seedExercises(executor);
 }
 
 /**

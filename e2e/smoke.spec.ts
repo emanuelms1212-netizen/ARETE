@@ -535,7 +535,9 @@ test.describe('plan', () => {
   test('reports consistency rather than only a streak', async ({ page }) => {
     // Creates its own habit: the seeded ones sit on the demo account's fixed
     // sample date, which retires as soon as another test accepts a real plan.
-    const title = `Drink water ${test.info().project.name}`;
+    // Unique per run as well as per project: against a long-lived server the
+    // previous run's habit is still there, and two identical titles are ambiguous.
+    const title = `Drink water ${test.info().project.name}-${Date.now().toString(36).slice(-5)}`;
     await openTab(page, 'Habits');
 
     await page.getByRole('button', { name: 'Add a habit' }).click();

@@ -51,6 +51,10 @@ duplicate. A focus session recorded three times is one row.
 | `0008_analytics`      | `analytics_events`                                                                                                                                             |
 | `0009_rls`            | Policies and grants for all of the above                                                                                                                       |
 | `0010_export_delete`  | `export_my_data()`, `delete_my_account()`                                                                                                                      |
+| `0011_onboarding`     | `onboarding_progress`, `health_profile`, `training_profile`, `nutrition_profile`, `mind_profile`, `plan_drafts`                                                |
+| `0012_daily_system`   | `goal_measurements`, `goal_reviews`, `day_reviews`; habit kinds, task subtasks, the day's framing, the focus timer's pause state                               |
+| `0013_mind`           | `mind_practices`, `user_content_packs`; the shared player columns on the three Mind session tables                                                             |
+| `0014_train`          | `workout_sessions`; set-level columns on `workout_logs`; instruction text on `exercises`; plan inputs on `training_profile`                                    |
 
 `daily_plan_items` is the one table not in the brief's list. A `daily_plans` row on its own
 cannot represent a day; this is the commitment the Today screen renders.
@@ -103,6 +107,14 @@ Some rules are too important to leave to application code that a later feature m
 | A skip has a reason                       | `check (status <> 'skipped' or skip_reason is not null)` — that is what makes a skip not a failure                                                                                             |
 | A movement is counted in reps **or** time | `check (num_nonnulls(reps, hold_seconds) = 1)`                                                                                                                                                 |
 | Cognitive drills report practice only     | No column is a cognitive score; the table comment says so                                                                                                                                      |
+| One running workout per person            | Partial unique index `workout_sessions_one_running`                                                                                                                                            |
+| A finished workout has an end time        | `check ((status = 'running') = (ended_at is null))`                                                                                                                                            |
+| One row per logged set                    | Unique `(workout_session_id, exercise_slug, set_index)`; logging a set again updates it                                                                                                        |
+| A set belongs to its owner's workout      | Trigger `guard_workout_log_owner` — RLS checks the row's `user_id`, a foreign key is checked with the owner's rights, so the trigger closes the gap                                            |
+| Pain is 0–10                              | `check (pain between 0 and 10)` on `workout_logs`                                                                                                                                              |
+| Two to six training days                  | `check (cardinality(training_weekdays) = 0 or cardinality(training_weekdays) between 2 and 6)`                                                                                                 |
+| Library exercise slugs are unique         | Partial unique index on `exercises (slug) where user_id is null` — `unique (user_id, slug)` alone lets nulls repeat                                                                            |
+| A loadable exercise has a load step       | `check (not loadable or increment_kg > 0)`                                                                                                                                                     |
 | Flexibility rights are unresolved         | `flexibility_programs.rights_status` defaults to `pending`, and the seed ships the hamstring programme as `pending`                                                                            |
 
 ## 5. Export and deletion
@@ -172,9 +184,10 @@ repository. The seed is idempotent: running it twice changes nothing, and a test
 - **No Supabase project exists yet.** Everything here is proven against an in-process
   Postgres; the migrations have not been applied to a hosted database. See
   `PROJECT_LEDGER.md` §8 for exactly what that needs.
-- **Repositories exist for days, focus sessions and onboarding only.** The other tables have
-  schema, policies and tests, but their repositories arrive with the modules that use them.
-  That is deliberate: an interface written before its screen is an interface written twice.
-- **No migration runner with a version table.** `npm run db:migrate` replays every file, which
-  is fine while they are all idempotent and the project is pre-release. A proper ledger table
-  is needed before the first production deploy.
+- **Repositories exist for days, onboarding, goals, tasks, habits, focus, Mind and Train.**
+  Nutrition, body metrics, flexibility and the journal have schema, policies and tests; their
+  repositories arrive with the modules that use them. An interface written before its screen
+  is an interface written twice.
+- **The training plan is not a table.** It is computed from `training_profile` and the logged
+  history every time it is needed (ledger D65). `workout_plans`, `workout_days` and
+  `workout_exercises` remain for library programmes, which nothing ships yet.

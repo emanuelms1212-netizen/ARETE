@@ -12,8 +12,7 @@ Working title. Renaming is a one-line change in `src/lib/app-config.ts`.
 
 ## Status
 
-**Stage 4 of 17 — data model, authentication and persistence.** There is a real schema
-now: 37 tables, row-level security on every one of them, and an authorization test suite
+**Stage 8 of 17 — Train.** There is a real schema: 49 tables, row-level security on every one of them, and an authorization test suite
 that runs against a real Postgres and actually tries to read another user's data. The app
 reads the signed-in user's own local day through a repository interface with two
 interchangeable implementations.
@@ -31,8 +30,14 @@ on the screen where the decision is made, and two cognitive drills that report p
 that drill and explicitly nothing else. An optional meditation pack exists and is off — its
 practices are absent until someone chooses it.
 
-Train and Progress still render an honest "not built yet" state naming the stage that builds
-them.
+Train is live: a deterministic plan engine that fits the week to the days, equipment, time and
+pain flags a person gives it (tennis days included), explains every rule it applied, and
+progresses only when the logged sets say so. Workouts are started, logged set by set with
+effort and pain, swapped within a movement pattern, and finished. Nine exercises have an
+original, data-driven SVG mannequin animation — tested for what the movement should look
+like — and every one of the fifty has a full text instruction.
+
+Progress still renders an honest "not built yet" state naming the stage that builds it.
 
 See `docs/PROJECT_LEDGER.md` for where the build stands and what comes next,
 `docs/DATA_MODEL.md` for the schema and the reasoning behind it,
