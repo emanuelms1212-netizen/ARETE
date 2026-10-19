@@ -22,6 +22,15 @@ import type {
 import type {
   Block,
   Checkin,
+  Food,
+  FoodEntry,
+  FoodInput,
+  MealSlot,
+  Nutrients,
+  NutritionSettings,
+  OilAwareness,
+  TargetOverride,
+  WeightPoint,
   DrillItem,
   FlexEnrolment,
   FlexItemRecord,
@@ -726,6 +735,116 @@ export interface FlexibilityRepository {
   listFlexCheckins(userId: string, enrolmentId: string): Promise<readonly StoredCheckin[]>;
 }
 
+// ---------------------------------------------------------------------------
+// Nutrition
+// ---------------------------------------------------------------------------
+
+export interface WaterLog {
+  readonly id: string;
+  readonly localDate: IsoDate;
+  readonly ml: number;
+  readonly loggedAt: string;
+}
+
+export type AddFoodEntryInput = {
+  readonly localDate: IsoDate;
+  readonly timeZone: string;
+  readonly slot: MealSlot;
+  readonly clientToken: string;
+} & (
+  | { readonly foodId: string; readonly servings: number }
+  | { readonly quickAdd: { readonly description: string; readonly nutrients: Nutrients } }
+);
+
+export interface NutritionRepository {
+  /** Stored settings, with onboarding's answers (numbers hidden, units) as the starting point. */
+  getNutritionSettings(userId: string): Promise<NutritionSettings>;
+  saveNutritionSettings(userId: string, settings: NutritionSettings): Promise<NutritionSettings>;
+  getTargetOverride(userId: string): Promise<TargetOverride | null>;
+  /** `null` clears it, returning to calculated targets. */
+  saveTargetOverride(
+    userId: string,
+    override: TargetOverride | null,
+    at: Date,
+  ): Promise<TargetOverride | null>;
+
+  /** The person's own foods and recipes, favourites first, then by name. Archived ones excluded. */
+  listFoods(userId: string): Promise<readonly Food[]>;
+  /** Creates or updates. A recipe's numbers are calculated here from its ingredients. */
+  saveFood(
+    userId: string,
+    input: { readonly id?: string; readonly food: FoodInput },
+  ): Promise<Food>;
+  setFoodFavourite(userId: string, foodId: string, favourite: boolean): Promise<Food>;
+  archiveFood(userId: string, foodId: string): Promise<void>;
+
+  listFoodEntries(
+    userId: string,
+    range: { readonly from: IsoDate; readonly to: IsoDate },
+  ): Promise<readonly FoodEntry[]>;
+  /** The food's numbers × servings are copied onto the entry, so editing the food later does not rewrite history. */
+  addFoodEntry(userId: string, input: AddFoodEntryInput): Promise<FoodEntry>;
+  updateFoodEntry(
+    userId: string,
+    entryId: string,
+    patch: {
+      readonly servings?: number;
+      readonly slot?: MealSlot;
+      readonly quickAdd?: { readonly description: string; readonly nutrients: Nutrients };
+    },
+  ): Promise<FoodEntry>;
+  deleteFoodEntry(userId: string, entryId: string): Promise<void>;
+  /** Copies one meal's entries onto another day. A repeated copy with the same token copies once. */
+  copyMeal(
+    userId: string,
+    input: {
+      readonly fromDate: IsoDate;
+      readonly toDate: IsoDate;
+      readonly slot: MealSlot;
+      readonly timeZone: string;
+      readonly clientToken: string;
+    },
+  ): Promise<readonly FoodEntry[]>;
+
+  addWater(
+    userId: string,
+    input: {
+      readonly localDate: IsoDate;
+      readonly timeZone: string;
+      readonly ml: number;
+      readonly at: Date;
+      readonly clientToken: string;
+    },
+  ): Promise<WaterLog>;
+  listWater(
+    userId: string,
+    range: { readonly from: IsoDate; readonly to: IsoDate },
+  ): Promise<readonly WaterLog[]>;
+  deleteWater(userId: string, id: string): Promise<void>;
+
+  /** One weigh-in per day; logging again that day corrects it. */
+  logWeight(
+    userId: string,
+    input: {
+      readonly localDate: IsoDate;
+      readonly timeZone: string;
+      readonly weightKg: number;
+      readonly at: Date;
+    },
+  ): Promise<WeightPoint>;
+  listWeights(
+    userId: string,
+    range: { readonly from: IsoDate; readonly to: IsoDate },
+  ): Promise<readonly WeightPoint[]>;
+  deleteWeight(userId: string, localDate: IsoDate): Promise<void>;
+
+  /** Null means the feature is off. */
+  getOilAwareness(userId: string): Promise<OilAwareness | null>;
+  saveOilAwareness(userId: string, value: OilAwareness): Promise<OilAwareness>;
+  /** Turns it off and deletes the list and every label note. */
+  deleteOilAwareness(userId: string): Promise<void>;
+}
+
 export interface AccountRepository {
   /** Everything the account holds, as one document. Immediate, no queue. */
   exportEverything(userId: string): Promise<AccountExport>;
@@ -744,6 +863,7 @@ export interface AreteRepository
     MindRepository,
     TrainRepository,
     FlexibilityRepository,
+    NutritionRepository,
     FocusSessionRepository,
     AccountRepository {
   readonly kind: 'memory' | 'sql';

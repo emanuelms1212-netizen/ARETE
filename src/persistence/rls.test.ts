@@ -498,3 +498,90 @@ describe('flexibility', () => {
     ).rejects.toThrow(/flexibility_three_days/);
   });
 });
+
+describe('nutrition', () => {
+  let theirMeal: string;
+  let theirFood: string;
+
+  beforeAll(async () => {
+    await database.asOwner();
+    const meal = await database.db.query<{ id: string }>(
+      `insert into public.meals (user_id, local_date, timezone, slot)
+       values ($1, '2026-03-02', 'UTC', 'lunch') returning id`,
+      [USER_B],
+    );
+    theirMeal = meal.rows[0]!.id;
+    const food = await database.db.query<{ id: string }>(
+      `insert into public.foods (user_id, name, serving_label, calories, source)
+       values ($1, 'Their soup', '1 bowl', 200, 'label') returning id`,
+      [USER_B],
+    );
+    theirFood = food.rows[0]!.id;
+    await database.db.query(
+      `insert into public.hydration_logs (user_id, local_date, timezone, ml) values ($1, '2026-03-02', 'UTC', 250)`,
+      [USER_B],
+    );
+    await database.db.query(
+      `insert into public.oil_awareness (user_id, cooking_oils) values ($1, '{olive}')`,
+      [USER_B],
+    );
+  });
+
+  it("cannot see another person's meals, foods, water or oil list", async () => {
+    await database.asUser(USER_A);
+    expect(await rows(`select * from public.meals where id = $1`, [theirMeal])).toEqual([]);
+    expect(await rows(`select * from public.foods where id = $1`, [theirFood])).toEqual([]);
+    expect(await rows(`select * from public.hydration_logs`)).toEqual([]);
+    expect(await rows(`select * from public.oil_awareness`)).toEqual([]);
+  });
+
+  it("cannot log food into another person's meal, or log another person's food", async () => {
+    await database.asUser(USER_A);
+    await expect(
+      database.db.query(
+        `insert into public.food_entries (user_id, meal_id, description) values ($1, $2, 'sneaky')`,
+        [USER_A, theirMeal],
+      ),
+    ).rejects.toThrow(/meal does not belong to this user/);
+
+    const mine = await database.db.query<{ id: string }>(
+      `insert into public.meals (user_id, local_date, timezone, slot)
+       values ($1, '2026-03-02', 'UTC', 'lunch') returning id`,
+      [USER_A],
+    );
+    await expect(
+      database.db.query(
+        `insert into public.food_entries (user_id, meal_id, food_id, quantity) values ($1, $2, $3, 1)`,
+        [USER_A, mine.rows[0]!.id, theirFood],
+      ),
+    ).rejects.toThrow(/food does not belong to this user/);
+  });
+
+  it('keeps one meal per day and slot, and refuses an unknown source or a recipe with no ingredients', async () => {
+    await database.asOwner();
+    await expect(
+      database.db.query(
+        `insert into public.meals (user_id, local_date, timezone, slot) values ($1, '2026-03-02', 'UTC', 'lunch')`,
+        [USER_B],
+      ),
+    ).rejects.toThrow(/meals_one_per_slot/);
+    await expect(
+      database.db.query(
+        `insert into public.foods (user_id, name, source) values ($1, 'Made up', 'internet')`,
+        [USER_B],
+      ),
+    ).rejects.toThrow(/food_source_known/);
+    await expect(
+      database.db.query(
+        `insert into public.foods (user_id, name, source) values ($1, 'Stew', 'recipe')`,
+        [USER_B],
+      ),
+    ).rejects.toThrow(/food_recipe_complete/);
+  });
+
+  it('turns oil awareness off by deleting the whole row', async () => {
+    await database.asUser(USER_B);
+    await database.db.query(`delete from public.oil_awareness`);
+    expect(await rows(`select * from public.oil_awareness`)).toEqual([]);
+  });
+});

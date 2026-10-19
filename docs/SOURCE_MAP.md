@@ -177,6 +177,15 @@ and states that mainstream guidance differs. The uncontroversial, non-ideologica
 suggests — read ingredient labels, know what is in a blend — is fine to surface on its own.
 The nutrition MVP is manual calorie/macro logging with no diet doctrine attached.
 
+**As built (stage 10, ledger D92):** an optional "ingredient and oil awareness" preference,
+off by default, under Food → Targets & settings. It holds the person's own prefer / limit /
+avoid list, cooking oils and ingredient-label notes, plus four fixed restaurant questions.
+Four short cards (`src/content/nutrition/oil-awareness.ts`) each set what the guide claims
+beside how settled the evidence is and what mainstream guidance says, in ARETE's own words;
+nothing is quoted or reproduced. No supplement — vitamin E, NAC or otherwise — and no extra
+saturated fat is recommended, and the screen says so. Turning it off deletes the row and
+every note with it.
+
 ---
 
 ## 7. `Total Flexibility - V2.pdf` — 72 pages

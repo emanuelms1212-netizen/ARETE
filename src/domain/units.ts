@@ -84,3 +84,31 @@ export function lengthToStorage(value: number, system: UnitSystem): number {
 export function distanceToStorage(value: number, system: UnitSystem): number {
   return system === 'metric' ? value : toKilometres(value);
 }
+
+// --- Food and body measurements -------------------------------------------------
+
+const GRAMS_PER_OUNCE = 28.349523125;
+
+export const gramsToOunces = (grams: number): number => grams / GRAMS_PER_OUNCE;
+export const ouncesToGrams = (ounces: number): number => ounces * GRAMS_PER_OUNCE;
+
+export function formatFoodMass(grams: number, system: UnitSystem): Measured {
+  return system === 'metric' ? measured(grams, 'g', 0) : measured(gramsToOunces(grams), 'oz', 1);
+}
+
+/** Height for display: centimetres, or feet and inches. */
+export function formatHeight(centimetres: number, system: UnitSystem): Measured {
+  if (system === 'metric') return measured(centimetres, 'cm', 0);
+  const totalInches = Math.round(toInches(centimetres));
+  const feet = Math.floor(totalInches / 12);
+  const inches = totalInches % 12;
+  return { value: totalInches, unit: 'in', text: `${feet} ft ${inches} in` };
+}
+
+export function feetInchesToCentimetres(feet: number, inches: number): number {
+  return toCentimetres(feet * 12 + inches);
+}
+
+export function volumeToStorage(value: number, system: UnitSystem): number {
+  return system === 'metric' ? value : toMillilitres(value);
+}

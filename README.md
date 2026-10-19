@@ -12,7 +12,7 @@ Working title. Renaming is a one-line change in `src/lib/app-config.ts`.
 
 ## Status
 
-**Stage 9 of 17 — Flexibility.** There is a real schema: 51 tables, row-level security on every one of them, and an authorization test suite
+**Stage 10 of 17 — Nutrition.** There is a real schema: 53 tables, row-level security on every one of them, and an authorization test suite
 that runs against a real Postgres and actually tries to read another user's data. The app
 reads the signed-in user's own local day through a repository interface with two
 interchangeable implementations.
@@ -41,6 +41,13 @@ Flexibility is live in demo mode: a four-week hamstring programme built from the
 structure in ARETE's own words, three sessions a week on days the person chooses, done in any
 order, with a warm-up gate, a pain exit that is always on screen, and weekly self-reports
 compared in words. It is used with the source author's permission.
+
+Food is live: meals and snacks logged with numbers or without, quick add, custom foods and
+recipes, favourites, copy the day before's meal, water, and daily and weekly views. Targets
+are ranges with their working shown, overridable, and never a budget. Safeguards for under-18s,
+pregnancy and postpartum, eating-disorder risk and prescribed diets remove what should not be
+there, and every number can be hidden. Demo foods say their numbers are synthetic. An optional
+weight trend and an optional ingredient/oil awareness preference are both off by default.
 
 Progress still renders an honest "not built yet" state naming the stage that builds it.
 

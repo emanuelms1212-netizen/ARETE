@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import { AlertIcon } from '@/components/icons';
 
 export interface SafetyNoticeProps {
@@ -18,15 +18,14 @@ export interface SafetyNoticeProps {
  * announced on an event, so it must not interrupt a screen reader mid-flow.
  */
 export function SafetyNotice({ title, children, action }: SafetyNoticeProps) {
+  // One id per notice: a screen can carry several, and each must name its own region.
+  const titleId = useId();
   return (
-    <section
-      aria-labelledby="safety-notice-title"
-      className="rounded-lg border border-line bg-surface p-4"
-    >
+    <section aria-labelledby={titleId} className="rounded-lg border border-line bg-surface p-4">
       <div className="flex gap-3">
         <AlertIcon size={20} className="mt-0.5 shrink-0 text-warn" />
         <div className="min-w-0">
-          <h2 id="safety-notice-title" className="text-body font-semibold text-ink">
+          <h2 id={titleId} className="text-body font-semibold text-ink">
             {title}
           </h2>
           <div className="mt-1 space-y-2 text-body-sm text-ink-muted">{children}</div>

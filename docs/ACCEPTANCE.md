@@ -760,7 +760,92 @@ travel; and the three Today metrics wrapped 2-then-1, so they became a three-col
 - [ ] **Animations for the remaining ten movements** — text instruction only for now.
 - [ ] **Migrations applied to a hosted database** — still no Supabase project.
 
-## Stages 10–17 — not started
+## Stage 10 — Nutrition: manual-first food logging
 
-Tracked in `docs/PROJECT_LEDGER.md` §8. No item below stage 10 may be ticked before the
+### Logging
+
+- [x] Meals and snacks per day: breakfast, lunch, dinner and snacks, each with add, edit,
+      move to another meal and delete
+- [x] Quick add — words alone are a complete entry; numbers optional, never nagged for
+- [x] Custom foods with a serving that need not be weighed, and recipes calculated from their
+      ingredients per serving, with incomplete ingredients said aloud
+- [x] Favourites, and copy the day before's meal (once per attempt, even on a retry)
+- [x] Daily view with totals and ranges; weekly view averaging over logged days only
+- [x] Protein, carbohydrate, fat, fibre and hydration tracked; water in ml or fl oz
+- [x] Every food and entry carries its data source: label, estimate, recipe, quick add or
+      **synthetic demo values** (D91). No nutrition value is invented
+- [x] Logging food today completes the day's food commitment (D94)
+- [x] Past days loggable within 30 days, refused beyond (D86)
+
+### Targets
+
+- [x] Energy and macro targets calculated transparently — every step shown, in words and
+      numbers, under "How this was worked out"
+- [x] Ranges, never budgets: no red states, "under / in range / over" in plain words (D90)
+- [x] User override, with a clinician flag; clearing returns to the calculation (D87)
+- [x] Aggressive deficits warned against: below 1200 kcal, below resting energy, or more than
+      20% under needs; a gentle loss is the most ARETE calculates (D90)
+- [x] Metric and US units: height in cm or ft/in, weight in kg or lb, food mass in g or oz,
+      water in ml or fl oz — conversions unit-tested, and switched end to end
+
+### Safeguards — each changes the experience when triggered (D89)
+
+- [x] Under 18 without a guardian or clinician: no calculated targets, no weight trend
+- [x] Pregnancy and postpartum: no calculated targets, no deficit; enter the midwife's or
+      doctor's numbers
+- [x] Eating-disorder risk ("counting or weighing has not helped me"): numbers hidden from the
+      start, no weight-loss range, no weight trend, support named — asserted in a browser
+- [x] Medically prescribed diet: nothing calculated; the clinician's targets are entered and
+      marked as theirs
+- [x] Calorie numbers can be hidden while meal and habit logging carry on; so can every number
+
+### Weight trend
+
+- [x] Optional, off by default, hideable; a 7-day rolling average with a per-week change in
+      words, never a single day's number as the headline (D93)
+
+### Ingredient / oil awareness
+
+- [x] Optional preference, **off by default**, not a health mandate
+- [x] Prefer / limit / avoid list, cooking oils, ingredient-label notes per food with matches
+      shown, and restaurant questions
+- [x] Educational cards separate the source's claim, the evidence status and mainstream
+      guidance, in neutral words; labelled as one author's viewpoint (SOURCE_MAP §6)
+- [x] No supplement or treatment recommended — vitamin E, NAC and saturated fat named
+- [x] **Turning it off deletes it with all related data** — in the repository contract, the
+      database and a browser (D92)
+
+### Acceptance, as the prompt states it
+
+- [x] **Food entries persist and totals reconcile** — after a reload, in a browser
+- [x] **Edits and deletes recalculate correctly** — quick add, servings and delete, in unit,
+      contract and browser tests
+- [x] **Unit conversions are tested**
+- [x] **Safeguards change the experience when triggered**
+- [x] **The oil preference stays off by default and can be deleted with all related data**
+
+### Security
+
+- [x] Row-level security on `hydration_logs` and `oil_awareness`; a trigger refuses food
+      logged into another person's meal or from another person's food — adversarial tests
+- [x] Nutrition data in the account export; deleted with the account
+
+### Verification
+
+- [x] `npm test` — **1076** unit, component and database tests
+- [x] `npm run e2e` — **162** end-to-end tests (18 skipped by design, D76), run twice
+      against a freshly started server
+- [x] Format, lint, typecheck and build all clean
+- [x] Screenshots inspected at 390×844 and 1440×900 — day, week, foods, targets and settings,
+      and the add dialog
+
+### Not done, and why
+
+- [ ] **A food database or barcode scanning** — out of scope for the MVP (PRODUCT_SPEC §5.5)
+- [ ] **Dietitian review of the targets** — needed before launch (ledger §7)
+- [ ] **Migrations applied to a hosted database** — still no Supabase project.
+
+## Stages 11–17 — not started
+
+Tracked in `docs/PROJECT_LEDGER.md` §8. No item below stage 11 may be ticked before the
 stage that builds it has run and been verified.

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { EXERCISES } from '@/content/train/exercises';
 import {
   buildWorkout,
+  dayTotals,
   generateFirstWeek,
   generateTrainingPlan,
   trainingSetupSchema,
@@ -2019,6 +2020,473 @@ export function describeRepositoryContract(
         await expect(
           repository.startFlexSession(userId, start(enrolment.id, 1, 1, 'f-9')),
         ).rejects.toThrow(/no longer active/);
+      });
+    });
+
+    describe('nutrition', () => {
+      const DATE = '2026-03-16';
+      const nutrients = (
+        kcal: number | null,
+        proteinG: number | null = null,
+        carbsG: number | null = null,
+        fatG: number | null = null,
+        fiberG: number | null = null,
+      ) => ({ kcal, proteinG, carbsG, fatG, fiberG });
+      let token = 0;
+      const nextToken = () => `n-${(token += 1)}`;
+
+      async function withFoods() {
+        const subject = await fresh();
+        const oats = await subject.repository.saveFood(subject.userId, {
+          food: {
+            name: 'Oats',
+            servingLabel: '40 g',
+            servingGrams: 40,
+            nutrients: nutrients(150, 5, 27, 3, 4),
+            source: 'label',
+          },
+        });
+        const milk = await subject.repository.saveFood(subject.userId, {
+          food: {
+            name: 'Milk',
+            servingLabel: '200 ml',
+            nutrients: nutrients(130, 7, 10, 7, 0),
+            source: 'estimate',
+          },
+        });
+        return { ...subject, oats, milk };
+      }
+
+      it('starts from defaults, and saves settings as given', async () => {
+        const { repository, userId } = await fresh();
+        const settings = await repository.getNutritionSettings(userId);
+        expect(settings).toMatchObject({
+          goal: 'none',
+          weightTrendEnabled: false,
+          eatingDisorderCaution: false,
+        });
+        const saved = await repository.saveNutritionSettings(userId, {
+          ...settings,
+          goal: 'maintain',
+          heightCm: 170,
+          birthYear: 1990,
+          sex: 'female',
+          unitSystem: 'us',
+          hideCalorieNumbers: true,
+        });
+        expect(await repository.getNutritionSettings(userId)).toEqual(saved);
+        expect(saved).toMatchObject({ unitSystem: 'us', hideCalorieNumbers: true, heightCm: 170 });
+      });
+
+      it('saves and clears a target override', async () => {
+        const { repository, userId } = await fresh();
+        expect(await repository.getTargetOverride(userId)).toBeNull();
+        const at = new Date('2026-03-16T08:00:00Z');
+        await repository.saveTargetOverride(
+          userId,
+          {
+            kcal: 2000,
+            proteinG: 120,
+            carbsG: null,
+            fatG: null,
+            fiberG: 30,
+            waterMl: null,
+            fromClinician: true,
+          },
+          at,
+        );
+        expect(await repository.getTargetOverride(userId)).toMatchObject({
+          kcal: 2000,
+          proteinG: 120,
+          fiberG: 30,
+          fromClinician: true,
+        });
+        await repository.saveTargetOverride(
+          userId,
+          {
+            kcal: 2100,
+            proteinG: null,
+            carbsG: null,
+            fatG: null,
+            fiberG: null,
+            waterMl: 2500,
+            fromClinician: false,
+          },
+          new Date('2026-03-20T08:00:00Z'),
+        );
+        expect(await repository.getTargetOverride(userId)).toMatchObject({
+          kcal: 2100,
+          waterMl: 2500,
+          fromClinician: false,
+        });
+        await repository.saveTargetOverride(userId, null, new Date('2026-03-21T08:00:00Z'));
+        expect(await repository.getTargetOverride(userId)).toBeNull();
+      });
+
+      it('keeps foods with their source, favourites first, and hides archived ones', async () => {
+        const { repository, userId, oats, milk } = await withFoods();
+        expect(oats.source).toBe('label');
+        expect(oats.servingGrams).toBe(40);
+        expect(milk.servingGrams).toBeNull();
+        await repository.setFoodFavourite(userId, milk.id, true);
+        expect((await repository.listFoods(userId)).map((food) => food.name)).toEqual([
+          'Milk',
+          'Oats',
+        ]);
+        await repository.archiveFood(userId, oats.id);
+        expect((await repository.listFoods(userId)).map((food) => food.name)).toEqual(['Milk']);
+      });
+
+      it('calculates a recipe from its ingredients, per serving', async () => {
+        const { repository, userId, oats, milk } = await withFoods();
+        const porridge = await repository.saveFood(userId, {
+          food: {
+            name: 'Porridge',
+            source: 'recipe',
+            ingredients: [
+              { foodId: oats.id, servings: 2 },
+              { foodId: milk.id, servings: 2 },
+            ],
+            servingsMade: 2,
+          },
+        });
+        expect(porridge.nutrients).toEqual(nutrients(280, 12, 37, 10, 4));
+        expect(porridge.source).toBe('recipe');
+        await expect(
+          repository.saveFood(userId, {
+            id: porridge.id,
+            food: {
+              name: 'Loop',
+              source: 'recipe',
+              ingredients: [{ foodId: porridge.id, servings: 1 }],
+              servingsMade: 1,
+            },
+          }),
+        ).rejects.toThrow(/cannot contain itself/);
+      });
+
+      it('persists entries, and the day total is the sum of them through add, edit and delete', async () => {
+        const { repository, userId, oats, milk } = await withFoods();
+        const a = await repository.addFoodEntry(userId, {
+          localDate: DATE,
+          timeZone: ZONE,
+          slot: 'breakfast',
+          foodId: oats.id,
+          servings: 1.5,
+          clientToken: nextToken(),
+        });
+        await repository.addFoodEntry(userId, {
+          localDate: DATE,
+          timeZone: ZONE,
+          slot: 'breakfast',
+          foodId: milk.id,
+          servings: 1,
+          clientToken: nextToken(),
+        });
+        const quick = await repository.addFoodEntry(userId, {
+          localDate: DATE,
+          timeZone: ZONE,
+          slot: 'snack',
+          quickAdd: { description: 'Biscuit at work', nutrients: nutrients(90) },
+          clientToken: nextToken(),
+        });
+        await repository.addFoodEntry(userId, {
+          localDate: '2026-03-17',
+          timeZone: ZONE,
+          slot: 'lunch',
+          foodId: milk.id,
+          servings: 1,
+          clientToken: nextToken(),
+        });
+
+        expect(a.nutrients).toEqual(nutrients(225, 7.5, 40.5, 4.5, 6));
+        let day = await repository.listFoodEntries(userId, { from: DATE, to: DATE });
+        expect(day.map((entry) => entry.slot)).toEqual(['breakfast', 'breakfast', 'snack']);
+        expect(dayTotals(day).nutrients.kcal).toBe(225 + 130 + 90);
+
+        await repository.updateFoodEntry(userId, a.id, { servings: 2 });
+        await repository.updateFoodEntry(userId, quick.id, {
+          quickAdd: { description: 'Two biscuits', nutrients: nutrients(180) },
+        });
+        day = await repository.listFoodEntries(userId, { from: DATE, to: DATE });
+        expect(dayTotals(day).nutrients.kcal).toBe(300 + 130 + 180);
+        expect(day.find((entry) => entry.id === quick.id)?.description).toBe('Two biscuits');
+
+        await repository.deleteFoodEntry(userId, quick.id);
+        day = await repository.listFoodEntries(userId, { from: DATE, to: DATE });
+        expect(dayTotals(day).nutrients.kcal).toBe(430);
+        expect(dayTotals(day).nutrients.proteinG).toBe(17);
+      });
+
+      it('keeps the logged numbers when the food is edited later', async () => {
+        const { repository, userId, oats } = await withFoods();
+        await repository.addFoodEntry(userId, {
+          localDate: DATE,
+          timeZone: ZONE,
+          slot: 'breakfast',
+          foodId: oats.id,
+          servings: 1,
+          clientToken: nextToken(),
+        });
+        await repository.saveFood(userId, {
+          id: oats.id,
+          food: { name: 'Oats', nutrients: nutrients(999), source: 'label' },
+        });
+        const [entry] = await repository.listFoodEntries(userId, { from: DATE, to: DATE });
+        expect(entry?.nutrients.kcal).toBe(150);
+      });
+
+      it('moves an entry to another meal', async () => {
+        const { repository, userId, oats } = await withFoods();
+        const entry = await repository.addFoodEntry(userId, {
+          localDate: DATE,
+          timeZone: ZONE,
+          slot: 'breakfast',
+          foodId: oats.id,
+          servings: 1,
+          clientToken: nextToken(),
+        });
+        const moved = await repository.updateFoodEntry(userId, entry.id, { slot: 'snack' });
+        expect(moved.slot).toBe('snack');
+        expect(moved.nutrients.kcal).toBe(150);
+      });
+
+      it('refuses nonsense: no food, silly servings, rewriting a food entry as a quick add', async () => {
+        const { repository, userId, oats } = await withFoods();
+        await expect(
+          repository.addFoodEntry(userId, {
+            localDate: DATE,
+            timeZone: ZONE,
+            slot: 'lunch',
+            foodId: oats.id,
+            servings: 0,
+            clientToken: nextToken(),
+          }),
+        ).rejects.toThrow();
+        await expect(
+          repository.addFoodEntry(userId, {
+            localDate: DATE,
+            timeZone: ZONE,
+            slot: 'lunch',
+            quickAdd: { description: '  ', nutrients: nutrients(null) },
+            clientToken: nextToken(),
+          }),
+        ).rejects.toThrow();
+        const entry = await repository.addFoodEntry(userId, {
+          localDate: DATE,
+          timeZone: ZONE,
+          slot: 'lunch',
+          foodId: oats.id,
+          servings: 1,
+          clientToken: nextToken(),
+        });
+        await expect(
+          repository.updateFoodEntry(userId, entry.id, {
+            quickAdd: { description: 'x', nutrients: nutrients(1) },
+          }),
+        ).rejects.toThrow(/Only a quick add/);
+      });
+
+      it('counts a retried add once', async () => {
+        const { repository, userId, oats } = await withFoods();
+        const t = nextToken();
+        const first = await repository.addFoodEntry(userId, {
+          localDate: DATE,
+          timeZone: ZONE,
+          slot: 'lunch',
+          foodId: oats.id,
+          servings: 1,
+          clientToken: t,
+        });
+        const again = await repository.addFoodEntry(userId, {
+          localDate: DATE,
+          timeZone: ZONE,
+          slot: 'lunch',
+          foodId: oats.id,
+          servings: 1,
+          clientToken: t,
+        });
+        expect(again.id).toBe(first.id);
+        expect(await repository.listFoodEntries(userId, { from: DATE, to: DATE })).toHaveLength(1);
+      });
+
+      it('copies a previous meal once, even when asked twice', async () => {
+        const { repository, userId, oats, milk } = await withFoods();
+        await repository.addFoodEntry(userId, {
+          localDate: '2026-03-15',
+          timeZone: ZONE,
+          slot: 'breakfast',
+          foodId: oats.id,
+          servings: 1,
+          clientToken: nextToken(),
+        });
+        await repository.addFoodEntry(userId, {
+          localDate: '2026-03-15',
+          timeZone: ZONE,
+          slot: 'breakfast',
+          foodId: milk.id,
+          servings: 1,
+          clientToken: nextToken(),
+        });
+        const t = nextToken();
+        const copied = await repository.copyMeal(userId, {
+          fromDate: '2026-03-15',
+          toDate: DATE,
+          slot: 'breakfast',
+          timeZone: ZONE,
+          clientToken: t,
+        });
+        await repository.copyMeal(userId, {
+          fromDate: '2026-03-15',
+          toDate: DATE,
+          slot: 'breakfast',
+          timeZone: ZONE,
+          clientToken: t,
+        });
+        expect(copied.map((entry) => entry.description)).toEqual(['Oats', 'Milk']);
+        const today = await repository.listFoodEntries(userId, { from: DATE, to: DATE });
+        expect(today).toHaveLength(2);
+        expect(dayTotals(today).nutrients.kcal).toBe(280);
+        expect(
+          await repository.copyMeal(userId, {
+            fromDate: '2026-03-01',
+            toDate: DATE,
+            slot: 'dinner',
+            timeZone: ZONE,
+            clientToken: nextToken(),
+          }),
+        ).toEqual([]);
+      });
+
+      it('logs and removes water', async () => {
+        const { repository, userId } = await fresh();
+        const t = nextToken();
+        const glass = await repository.addWater(userId, {
+          localDate: DATE,
+          timeZone: ZONE,
+          ml: 250,
+          at: new Date('2026-03-16T09:00:00Z'),
+          clientToken: t,
+        });
+        await repository.addWater(userId, {
+          localDate: DATE,
+          timeZone: ZONE,
+          ml: 250,
+          at: new Date('2026-03-16T09:00:00Z'),
+          clientToken: t,
+        });
+        await repository.addWater(userId, {
+          localDate: DATE,
+          timeZone: ZONE,
+          ml: 500,
+          at: new Date('2026-03-16T12:00:00Z'),
+          clientToken: nextToken(),
+        });
+        expect(
+          (await repository.listWater(userId, { from: DATE, to: DATE })).map((log) => log.ml),
+        ).toEqual([250, 500]);
+        await repository.deleteWater(userId, glass.id);
+        expect(
+          (await repository.listWater(userId, { from: DATE, to: DATE })).map((log) => log.ml),
+        ).toEqual([500]);
+        await expect(
+          repository.addWater(userId, {
+            localDate: DATE,
+            timeZone: ZONE,
+            ml: 0,
+            at: new Date(),
+            clientToken: nextToken(),
+          }),
+        ).rejects.toThrow();
+      });
+
+      it('keeps one weigh-in per day, corrected by logging again', async () => {
+        const { repository, userId } = await fresh();
+        await repository.logWeight(userId, {
+          localDate: '2026-03-15',
+          timeZone: ZONE,
+          weightKg: 80.04,
+          at: new Date(),
+        });
+        await repository.logWeight(userId, {
+          localDate: DATE,
+          timeZone: ZONE,
+          weightKg: 79.6,
+          at: new Date(),
+        });
+        await repository.logWeight(userId, {
+          localDate: DATE,
+          timeZone: ZONE,
+          weightKg: 79.8,
+          at: new Date(),
+        });
+        expect(await repository.listWeights(userId, { from: '2026-03-01', to: DATE })).toEqual([
+          { localDate: '2026-03-15', weightKg: 80 },
+          { localDate: DATE, weightKg: 79.8 },
+        ]);
+        await repository.deleteWeight(userId, DATE);
+        expect(await repository.listWeights(userId, { from: '2026-03-01', to: DATE })).toHaveLength(
+          1,
+        );
+        await expect(
+          repository.logWeight(userId, {
+            localDate: DATE,
+            timeZone: ZONE,
+            weightKg: 4,
+            at: new Date(),
+          }),
+        ).rejects.toThrow();
+      });
+
+      it('keeps oil awareness off by default, and deletes all of it when turned off', async () => {
+        const { repository, userId, oats } = await withFoods();
+        expect(await repository.getOilAwareness(userId)).toBeNull();
+        await repository.saveOilAwareness(userId, {
+          cookingOils: ['Olive oil'],
+          list: [{ ingredient: 'canola', stance: 'limit' }],
+          labelNotes: { [oats.id]: 'oats, canola oil' },
+        });
+        expect(await repository.getOilAwareness(userId)).toMatchObject({
+          cookingOils: ['Olive oil'],
+          labelNotes: { [oats.id]: 'oats, canola oil' },
+        });
+        await repository.deleteOilAwareness(userId);
+        expect(await repository.getOilAwareness(userId)).toBeNull();
+      });
+
+      it('are in the account export, and the oil preference leaves it when turned off', async () => {
+        const { repository, userId, oats } = await withFoods();
+        await repository.addFoodEntry(userId, {
+          localDate: DATE,
+          timeZone: ZONE,
+          slot: 'breakfast',
+          clientToken: nextToken(),
+          foodId: oats.id,
+          servings: 1,
+        });
+        await repository.addWater(userId, {
+          localDate: DATE,
+          timeZone: ZONE,
+          ml: 300,
+          at: new Date(`${DATE}T09:00:00Z`),
+          clientToken: nextToken(),
+        });
+        await repository.saveOilAwareness(userId, {
+          cookingOils: ['Ghee'],
+          list: [],
+          labelNotes: {},
+        });
+
+        const before = await repository.exportEverything(userId);
+        expect(before.tables['food_entries']).toHaveLength(1);
+        expect(before.tables['hydration_logs']).toHaveLength(1);
+        expect(before.tables['foods']?.length).toBeGreaterThanOrEqual(2);
+        expect(before.tables['oil_awareness']).toHaveLength(1);
+
+        await repository.deleteOilAwareness(userId);
+        const after = await repository.exportEverything(userId);
+        expect(after.tables['oil_awareness'] ?? []).toHaveLength(0);
+        expect(after.tables['food_entries']).toHaveLength(1);
       });
     });
 

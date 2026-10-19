@@ -48,6 +48,12 @@ export {
   toMiles,
   toMillilitres,
   toPounds,
+  feetInchesToCentimetres,
+  formatFoodMass,
+  formatHeight,
+  gramsToOunces,
+  ouncesToGrams,
+  volumeToStorage,
 } from './units';
 export type { Measured, UnitSystem } from './units';
 export { clientToken, focusSessionToken, habitLogToken, workoutSetToken } from './idempotency';
@@ -197,3 +203,4 @@ export * from './workout-session';
 // The mannequin is imported from '@/domain/mannequin' directly: its names
 // (Frame, Limb, Cue) are too generic to put into the shared namespace.
 export * from './flexibility';
+export * from './nutrition';

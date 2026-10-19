@@ -62,7 +62,14 @@ export default async function TrainPage() {
         title="Train"
         lede="A plan that fits your week, gets harder only when your sets say so, and always has a smaller version."
       />
-      <nav aria-label="More in Train" className="grid grid-cols-2 gap-3">
+      <nav aria-label="More in Train" className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <Link
+          href="/train/food"
+          className="rounded-xl border border-line bg-surface p-3 hover:border-line-strong"
+        >
+          <span className="block text-body font-semibold text-ink">Food</span>
+          <span className="block text-body-sm text-ink-muted">Meals, water, targets</span>
+        </Link>
         <Link
           href="/train/flexibility"
           className="rounded-xl border border-line bg-surface p-3 hover:border-line-strong"

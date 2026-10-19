@@ -15,6 +15,8 @@ import { demoDays, demoSeed, type DemoSeed } from './demo-data';
 import { createMemoryDailySystem } from './memory/daily-system';
 import { createMemoryMind } from './memory/mind';
 import { createMemoryFlexibility } from './memory/flexibility';
+import { createMemoryNutrition } from './memory/nutrition';
+import { demoNutrition } from './demo-nutrition';
 import { createMemoryTrain } from './memory/train';
 import { demoTraining } from './demo-training';
 import {
@@ -128,6 +130,41 @@ export function createMemoryRepository(
   // Flexibility programmes.
   const { exportFlexibility, deleteFlexibility, ...flexibility } = createMemoryFlexibility();
 
+  // Nutrition. Onboarding's food answers (numbers hidden, units) and birth year
+  // are the starting point for settings, and saving settings keeps them in step.
+  const { seedNutrition, exportNutrition, deleteNutrition, ...nutrition } = createMemoryNutrition({
+    defaults: (userId) => {
+      const answers = onboardingFor(userId).answers as Record<
+        string,
+        Record<string, unknown> | undefined
+      >;
+      const food = answers['food'] ?? {};
+      const age = answers['age'] ?? {};
+      return {
+        ...(typeof food['hideCalorieNumbers'] === 'boolean'
+          ? { hideCalorieNumbers: food['hideCalorieNumbers'] }
+          : {}),
+        ...(food['unitSystem'] === 'us' || food['unitSystem'] === 'metric'
+          ? { unitSystem: food['unitSystem'] }
+          : {}),
+        ...(typeof age['birthYear'] === 'number' ? { birthYear: age['birthYear'] } : {}),
+      };
+    },
+    onSettingsSaved: (userId, settings) => {
+      const record = onboardingFor(userId);
+      const previous = (record.answers['food'] ?? {}) as Record<string, unknown>;
+      record.answers = {
+        ...record.answers,
+        food: {
+          ...previous,
+          hideCalorieNumbers: settings.hideCalorieNumbers,
+          unitSystem: settings.unitSystem,
+        },
+      };
+    },
+  });
+  if (planSeed !== null) seedNutrition(seedUserId, demoNutrition());
+
   function onboardingFor(userId: string): OnboardingRecord {
     let record = state.onboarding.get(userId);
     if (!record) {
@@ -181,6 +218,7 @@ export function createMemoryRepository(
     ...mind,
     ...train,
     ...flexibility,
+    ...nutrition,
 
     async getOnboarding(userId: string) {
       return onboardingState(userId);
@@ -362,6 +400,7 @@ export function createMemoryRepository(
           focus_sessions: focus,
           ...exportTrain(userId),
           ...exportFlexibility(userId),
+          ...exportNutrition(userId),
         },
       };
     },
@@ -375,6 +414,7 @@ export function createMemoryRepository(
       }
       deleteTrain(userId);
       deleteFlexibility(userId);
+      deleteNutrition(userId);
     },
   };
 }

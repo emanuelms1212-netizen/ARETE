@@ -39,24 +39,25 @@ duplicate. A focus session recorded three times is one row.
 
 ## 2. The tables
 
-| Migration                 | Tables                                                                                                                                                                  |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `0001_foundation`         | Helper functions: `set_updated_at`, `attach_updated_at`, `current_user_id`                                                                                              |
-| `0002_identity`           | `profiles`, `preferences`, `onboarding_answers`, `notification_preferences`, `safety_acknowledgements`                                                                  |
-| `0003_planning`           | `goals`, `milestones`, `projects`, `tasks`, `task_occurrences`, `habits`, `habit_schedules`, `habit_logs`, `daily_plans`, `daily_plan_items`                            |
-| `0004_sessions`           | `focus_sessions`, `meditation_sessions`, `breathwork_sessions`, `cognitive_sessions`                                                                                    |
-| `0005_training`           | `exercises`, `exercise_animation_assets`, `workout_plans`, `workout_days`, `workout_exercises`, `workout_logs`, `flexibility_programs`, `flexibility_sessions`          |
-| `0006_nutrition_body`     | `nutrition_targets`, `foods`, `meals`, `food_entries`, `body_metrics`                                                                                                   |
-| `0007_content`            | `content_sources`, `content_packs`, `quotes`, `journal_entries`                                                                                                         |
-| `0008_analytics`          | `analytics_events`                                                                                                                                                      |
-| `0009_rls`                | Policies and grants for all of the above                                                                                                                                |
-| `0010_export_delete`      | `export_my_data()`, `delete_my_account()`                                                                                                                               |
-| `0011_onboarding`         | `onboarding_progress`, `health_profile`, `training_profile`, `nutrition_profile`, `mind_profile`, `plan_drafts`                                                         |
-| `0012_daily_system`       | `goal_measurements`, `goal_reviews`, `day_reviews`; habit kinds, task subtasks, the day's framing, the focus timer's pause state                                        |
-| `0013_mind`               | `mind_practices`, `user_content_packs`; the shared player columns on the three Mind session tables                                                                      |
-| `0014_train`              | `workout_sessions`; set-level columns on `workout_logs`; instruction text on `exercises`; plan inputs on `training_profile`                                             |
-| `0015_flexibility`        | `flexibility_enrolments`, `flexibility_checkins`; status, warm-up, items, notes and skip reason on `flexibility_sessions`; library slug index on `flexibility_programs` |
-| `0016_flexibility_rights` | Clears the hamstring programme and adds the `third-party-permission-granted` licence (ledger D85)                                                                       |
+| Migration                 | Tables                                                                                                                                                                      |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0001_foundation`         | Helper functions: `set_updated_at`, `attach_updated_at`, `current_user_id`                                                                                                  |
+| `0002_identity`           | `profiles`, `preferences`, `onboarding_answers`, `notification_preferences`, `safety_acknowledgements`                                                                      |
+| `0003_planning`           | `goals`, `milestones`, `projects`, `tasks`, `task_occurrences`, `habits`, `habit_schedules`, `habit_logs`, `daily_plans`, `daily_plan_items`                                |
+| `0004_sessions`           | `focus_sessions`, `meditation_sessions`, `breathwork_sessions`, `cognitive_sessions`                                                                                        |
+| `0005_training`           | `exercises`, `exercise_animation_assets`, `workout_plans`, `workout_days`, `workout_exercises`, `workout_logs`, `flexibility_programs`, `flexibility_sessions`              |
+| `0006_nutrition_body`     | `nutrition_targets`, `foods`, `meals`, `food_entries`, `body_metrics`                                                                                                       |
+| `0007_content`            | `content_sources`, `content_packs`, `quotes`, `journal_entries`                                                                                                             |
+| `0008_analytics`          | `analytics_events`                                                                                                                                                          |
+| `0009_rls`                | Policies and grants for all of the above                                                                                                                                    |
+| `0010_export_delete`      | `export_my_data()`, `delete_my_account()`                                                                                                                                   |
+| `0011_onboarding`         | `onboarding_progress`, `health_profile`, `training_profile`, `nutrition_profile`, `mind_profile`, `plan_drafts`                                                             |
+| `0012_daily_system`       | `goal_measurements`, `goal_reviews`, `day_reviews`; habit kinds, task subtasks, the day's framing, the focus timer's pause state                                            |
+| `0013_mind`               | `mind_practices`, `user_content_packs`; the shared player columns on the three Mind session tables                                                                          |
+| `0014_train`              | `workout_sessions`; set-level columns on `workout_logs`; instruction text on `exercises`; plan inputs on `training_profile`                                                 |
+| `0015_flexibility`        | `flexibility_enrolments`, `flexibility_checkins`; status, warm-up, items, notes and skip reason on `flexibility_sessions`; library slug index on `flexibility_programs`     |
+| `0016_flexibility_rights` | Clears the hamstring programme and adds the `third-party-permission-granted` licence (ledger D85)                                                                           |
+| `0017_nutrition`          | `hydration_logs`, `oil_awareness`; food settings on `nutrition_profile`; fibre, water and clinician flag on `nutrition_targets`; recipes, favourites and sources on `foods` |
 
 `daily_plan_items` is the one table not in the brief's list. A `daily_plans` row on its own
 cannot represent a day; this is the commitment the Today screen renders.
@@ -121,6 +122,12 @@ Some rules are too important to leave to application code that a later feature m
 | A flexibility stop is pain; a skip has why               | `check (status <> 'stopped' or pain_reported)`, `check (status <> 'skipped' or skip_reason is not null)`                                                                                       |
 | A flexibility session closes once                        | Partial unique index on `(enrolment_id, week, day)` where completed or skipped; stopped attempts may repeat                                                                                    |
 | Sessions and check-ins belong to their owner's enrolment | Trigger `guard_flexibility_enrolment_owner`, for the same reason as the workout-set trigger                                                                                                    |
+| A food says where its numbers came from                  | `check (source in ('label','estimate','recipe','synthetic-demo'))` on `foods`; entries add `quick-add`                                                                                         |
+| A recipe has ingredients and a yield                     | `check (source is distinct from 'recipe' or (jsonb_array_length(ingredients) > 0 and servings_made is not null))`                                                                              |
+| One meal row per day and slot                            | Unique index `meals_one_per_slot`                                                                                                                                                              |
+| One current target override                              | Partial unique index `nutrition_targets_one_current` where `effective_to is null`; older rows are kept as history                                                                              |
+| Food is logged into the owner's meal, from their foods   | Trigger `guard_food_entry_owner`, for the same reason as the workout-set trigger                                                                                                               |
+| The oil preference is deleted whole                      | `oil_awareness` is one row per person; its existence is the switch, and turning it off deletes it (ledger D92)                                                                                 |
 | Flexibility rights are unresolved                        | `flexibility_programs.rights_status` defaults to `pending`, and the seed ships the hamstring programme as `pending`                                                                            |
 
 ## 5. Export and deletion
@@ -190,10 +197,12 @@ repository. The seed is idempotent: running it twice changes nothing, and a test
 - **No Supabase project exists yet.** Everything here is proven against an in-process
   Postgres; the migrations have not been applied to a hosted database. See
   `PROJECT_LEDGER.md` §8 for exactly what that needs.
-- **Repositories exist for days, onboarding, goals, tasks, habits, focus, Mind, Train and
-  Flexibility.** Nutrition, body metrics and the journal have schema, policies and tests; their
-  repositories arrive with the modules that use them. An interface written before its screen
+- **Repositories exist for days, onboarding, goals, tasks, habits, focus, Mind, Train,
+  Flexibility and Nutrition** (weigh-ins included, on `body_metrics`). The journal has schema,
+  policies and tests; its repository arrives with the module that uses it. An interface written before its screen
   is an interface written twice.
+- **Calculated nutrition targets are not stored either.** They follow from the settings and
+  the latest weigh-in (ledger D87); only a person's own or their clinician's numbers are.
 - **The training plan is not a table.** It is computed from `training_profile` and the logged
   history every time it is needed (ledger D65). `workout_plans`, `workout_days` and
   `workout_exercises` remain for library programmes, which nothing ships yet.
