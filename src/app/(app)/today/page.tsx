@@ -8,6 +8,9 @@ import { Framing } from '@/components/today/framing';
 import { FocusSessionPanel } from '@/components/focus/focus-session';
 import { EmptyState, Metric, PageHeader, Section } from '@/components/ui';
 import { loadResetContext, type ResetContext } from '../programs/reset/context';
+import { Reminders } from '@/components/notifications/reminders';
+import { actOnNotificationAction } from '../settings/notifications/actions';
+import { loadNotificationContext } from '../settings/notifications/context';
 import { computeDayProgress, describeDay, type DayProgress } from '@/domain';
 import { withUser } from '@/persistence';
 import { resolveCurrentDay } from '../current-day';
@@ -135,7 +138,7 @@ export default async function TodayPage() {
 
   // The page and the actions must agree on which day this screen is about;
   // `resolveCurrentDay` is the one answer both of them use.
-  const { day, framing, review, runningFocus, focusTasks, localDate, onboarded, reset } =
+  const { day, framing, review, runningFocus, focusTasks, localDate, onboarded, reset, reminders } =
     await withUser(user.id, async (repository) => {
       const { localDate: date } = await resolveCurrentDay(repository, user);
       const { progress } = await repository.getOnboarding(user.id);
@@ -154,6 +157,22 @@ export default async function TodayPage() {
         onboarded: progress.completedAt !== null,
         // The reset's day, so Today can say where it stands and link to it.
         reset: await loadResetContext(repository, user.id, date),
+        reminders: (
+          await loadNotificationContext(
+            repository,
+            user.id,
+            date,
+            await repository.getTimeZone(user.id),
+            new Date(),
+          )
+        ).due.map((notification) => ({
+          key: notification.key,
+          at: notification.at,
+          title: notification.title,
+          body: notification.body,
+          href: notification.href,
+          completable: notification.items.length > 0,
+        })),
       };
     });
 
@@ -174,6 +193,8 @@ export default async function TodayPage() {
       />
 
       {onboarded ? null : <SetUpFirstWeek onboarded={onboarded} />}
+
+      <Reminders due={reminders} onAct={actOnNotificationAction} />
 
       <Framing
         intention={framing.intention}

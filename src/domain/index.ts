@@ -208,3 +208,7 @@ export * from './nutrition';
 export * from './reset-program';
 export * from './contrast';
 export * from './journal';
+export * from './progress';
+export * from './notifications';
+export * from './export';
+export * from './week-proposal';

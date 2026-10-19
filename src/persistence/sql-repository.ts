@@ -24,6 +24,7 @@ import { createSqlMind } from './sql/mind';
 import { createSqlFlexibility } from './sql/flexibility';
 import { createSqlNutrition } from './sql/nutrition';
 import { createSqlPrograms } from './sql/programs';
+import { createSqlNotifications } from './sql/notifications';
 import { createSqlTrain } from './sql/train';
 import type { SqlExecutor } from './sql-executor';
 
@@ -143,6 +144,7 @@ export function createSqlRepository(executor: SqlExecutor): AreteRepository {
   const flexibility = createSqlFlexibility(executor);
   const nutrition = createSqlNutrition(executor);
   const programs = createSqlPrograms(executor);
+  const notifications = createSqlNotifications(executor);
 
   // ---------------------------------------------------------------------
   // Onboarding
@@ -359,6 +361,7 @@ export function createSqlRepository(executor: SqlExecutor): AreteRepository {
     ...flexibility,
     ...nutrition,
     ...programs,
+    ...notifications,
 
     async getOnboarding(userId: string) {
       return loadOnboarding(userId);
@@ -630,6 +633,34 @@ export function createSqlRepository(executor: SqlExecutor): AreteRepository {
         status: row.status === 'running' ? 'abandoned' : row.status,
         clientToken: row.client_token,
       };
+    },
+
+    async listFocusSessionsBetween(userId, range) {
+      const found = await executor.query<FocusRow>(
+        `select id, local_date::text, planned_minutes, actual_seconds, interruptions, status, client_token
+           from public.focus_sessions
+          where user_id = $1 and local_date between $2 and $3 and status <> 'running'
+          order by started_at`,
+        [userId, range.from, range.to],
+      );
+      return found.rows.map((row) => ({
+        id: row.id,
+        localDate: row.local_date,
+        plannedMinutes: Number(row.planned_minutes),
+        actualSeconds: Number(row.actual_seconds),
+        interruptions: Number(row.interruptions),
+        status: row.status === 'running' ? ('abandoned' as const) : row.status,
+        clientToken: row.client_token,
+      }));
+    },
+
+    async listMinimumDays(userId, range) {
+      const found = await executor.query<{ local_date: string }>(
+        `select local_date::text from public.daily_plans
+          where user_id = $1 and minimum_mode and local_date between $2 and $3 order by local_date`,
+        [userId, range.from, range.to],
+      );
+      return found.rows.map((row) => row.local_date);
     },
 
     async listFocusSessions(userId, localDate) {

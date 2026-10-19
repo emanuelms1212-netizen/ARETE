@@ -29,6 +29,8 @@ import type {
   ResetLog,
   ResetLogStatus,
   WeeklyPromptKey,
+  NotificationEvent,
+  NotificationPreferences,
 } from '@/domain';
 import type {
   Block,
@@ -1006,6 +1008,41 @@ export interface ProgramsRepository {
   deleteContrastSessions(userId: string): Promise<void>;
 }
 
+export interface NotificationRepository {
+  /** Defaults (everything off, cap of two, quiet 22:00–07:00) until the person saves their own. */
+  getNotificationPreferences(userId: string): Promise<NotificationPreferences>;
+  saveNotificationPreferences(
+    userId: string,
+    preferences: NotificationPreferences,
+  ): Promise<NotificationPreferences>;
+  listNotificationEvents(
+    userId: string,
+    range: { readonly from: IsoDate; readonly to: IsoDate },
+  ): Promise<readonly NotificationEvent[]>;
+  recordNotificationEvent(
+    userId: string,
+    event: NotificationEvent & { readonly timeZone: string },
+  ): Promise<NotificationEvent>;
+}
+
+/** Range reads for Progress, so a 90-day view is three queries rather than 180. */
+export interface ProgressRepository {
+  listFocusSessionsBetween(
+    userId: string,
+    range: { readonly from: IsoDate; readonly to: IsoDate },
+  ): Promise<readonly FocusSession[]>;
+  /** Local dates the person ran at the minimum. */
+  listMinimumDays(
+    userId: string,
+    range: { readonly from: IsoDate; readonly to: IsoDate },
+  ): Promise<readonly IsoDate[]>;
+  /** Flexibility sessions across every enrolment, by local date. */
+  listFlexSessionsBetween(
+    userId: string,
+    range: { readonly from: IsoDate; readonly to: IsoDate },
+  ): Promise<readonly FlexSessionRecord[]>;
+}
+
 export interface AccountRepository {
   /** Everything the account holds, as one document. Immediate, no queue. */
   exportEverything(userId: string): Promise<AccountExport>;
@@ -1026,6 +1063,8 @@ export interface AreteRepository
     FlexibilityRepository,
     NutritionRepository,
     ProgramsRepository,
+    ProgressRepository,
+    NotificationRepository,
     FocusSessionRepository,
     AccountRepository {
   readonly kind: 'memory' | 'sql';

@@ -175,11 +175,11 @@ test.describe.serial('programmes: the reset, the journal and contrast therapy', 
     await expect(page.getByText(`Mornings are for writing ${stamp}`)).toBeVisible();
     await expect(page.getByText('Courage')).toBeVisible();
 
-    await page.getByLabel(/what do I notice/).fill(`Steadier mornings ${stamp}`);
+    await page.getByLabel('What moved forward?').fill(`Steadier mornings ${stamp}`);
     await page.getByRole('button', { name: 'Save the review' }).click();
     await expect(page.getByText('Weekly review saved.')).toBeVisible();
     await page.reload();
-    await expect(page.getByLabel(/what do I notice/)).toHaveValue(`Steadier mornings ${stamp}`);
+    await expect(page.getByLabel('What moved forward?')).toHaveValue(`Steadier mornings ${stamp}`);
   });
 
   test('contrast therapy is screened, timed, stoppable, and turns off completely', async ({

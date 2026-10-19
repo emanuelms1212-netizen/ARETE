@@ -673,3 +673,40 @@ describe('programmes and reflection', () => {
     ).rejects.toThrow(/daily_plan_virtue_known/);
   });
 });
+
+describe('notifications', () => {
+  beforeAll(async () => {
+    await database.asOwner();
+    await database.db.query(
+      `insert into public.notification_events (user_id, local_date, timezone, key, kind, action)
+       values ($1, '2026-03-02', 'UTC', 'morning_plan', 'morning_plan', 'dismissed')`,
+      [USER_B],
+    );
+  });
+
+  it("cannot see another person's reminders or settings", async () => {
+    await database.asUser(USER_A);
+    expect(await rows(`select * from public.notification_events`)).toEqual([]);
+    const settings = await rows<{ user_id: string }>(
+      `select user_id from public.notification_preferences`,
+    );
+    expect(settings.every((row) => row.user_id === USER_A)).toBe(true);
+  });
+
+  it('refuses a cap outside one to six, and a snooze with no time', async () => {
+    await database.asOwner();
+    await expect(
+      database.db.query(
+        `update public.notification_preferences set daily_cap = 9 where user_id = $1`,
+        [USER_A],
+      ),
+    ).rejects.toThrow(/notification_cap_range/);
+    await expect(
+      database.db.query(
+        `insert into public.notification_events (user_id, local_date, timezone, key, kind, action)
+         values ($1, '2026-03-02', 'UTC', 'bundle', 'open_items', 'snoozed')`,
+        [USER_A],
+      ),
+    ).rejects.toThrow(/notification_snooze_has_time/);
+  });
+});

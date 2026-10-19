@@ -12,7 +12,7 @@ Working title. Renaming is a one-line change in `src/lib/app-config.ts`.
 
 ## Status
 
-**Stage 11 of 17 — Programmes and reflection.** There is a real schema: 59 tables, row-level security on every one of them, and an authorization test suite
+**Stage 12 of 17 — Progress and quiet notifications.** There is a real schema: 60 tables, row-level security on every one of them, and an authorization test suite
 that runs against a real Postgres and actually tries to read another user's data. The app
 reads the signed-in user's own local day through a repository interface with two
 interchangeable implementations.
@@ -56,7 +56,12 @@ morning and evening questions into a weekly review that sets the week's facts be
 person's reflection. Contrast therapy is an optional, screened pack with a conservative timer
 that is always one tap from stopping.
 
-Progress still renders an honest "not built yet" state naming the stage that builds it.
+Progress is live: date ranges, a plain-language narrative, one chart per module with a text
+summary and a table, streaks beside rolling consistency, observations that are labelled as such
+and never causal, and an export of the range. The weekly review proposes next week from open
+tasks, habits, training and recovery, and adds only what the person ticks. Notifications are
+quiet by default: per-module switches, quiet hours, a daily cap, bundling, snooze and done, and
+a practice reminder that is off unless chosen and only ever in the person's own words.
 
 See `docs/PROJECT_LEDGER.md` for where the build stands and what comes next,
 `docs/DATA_MODEL.md` for the schema and the reasoning behind it,

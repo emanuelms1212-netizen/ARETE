@@ -10,6 +10,7 @@ import {
   type IsoDate,
   type OnboardingProgress,
   type OnboardingStep,
+  addDays,
 } from '@/domain';
 import { demoDays, demoSeed, type DemoSeed } from './demo-data';
 import { createMemoryDailySystem } from './memory/daily-system';
@@ -17,6 +18,7 @@ import { createMemoryMind } from './memory/mind';
 import { createMemoryFlexibility } from './memory/flexibility';
 import { createMemoryNutrition } from './memory/nutrition';
 import { createMemoryPrograms } from './memory/programs';
+import { createMemoryNotifications } from './memory/notifications';
 import { demoNutrition } from './demo-nutrition';
 import { createMemoryTrain } from './memory/train';
 import { demoTraining } from './demo-training';
@@ -96,6 +98,9 @@ export function createMemoryRepository(
   // Goals, tasks, habits, the day's framing and the live timer. Kept in their
   // own module because the day loop added five entities at once.
   const daily = createMemoryDailySystem({
+    onFocusFinished: (userId, session) => {
+      state.focus.set(`${userId}::timer::${session.id}`, session);
+    },
     getDay: (userId, localDate) => state.days.get(key(userId, localDate)),
     requireDay,
     saveDay: save,
@@ -166,6 +171,9 @@ export function createMemoryRepository(
   });
   if (planSeed !== null) seedNutrition(seedUserId, demoNutrition());
 
+  const { exportNotifications, deleteNotifications, ...notifications } =
+    createMemoryNotifications();
+
   // The reset, the journal's weekly review and contrast therapy. The journal's
   // daily pages are the framing and review the day system already holds.
   const { exportPrograms, deletePrograms, ...programs } = createMemoryPrograms({
@@ -230,6 +238,7 @@ export function createMemoryRepository(
     ...flexibility,
     ...nutrition,
     ...programs,
+    ...notifications,
 
     async getOnboarding(userId: string) {
       return onboardingState(userId);
@@ -387,6 +396,21 @@ export function createMemoryRepository(
       return session;
     },
 
+    async listFocusSessionsBetween(userId, range) {
+      return [...state.focus.entries()]
+        .filter(([mapKey]) => mapKey.startsWith(`${userId}::`))
+        .map(([, session]) => session)
+        .filter((session) => session.localDate >= range.from && session.localDate <= range.to);
+    },
+
+    async listMinimumDays(userId, range) {
+      const dates: IsoDate[] = [];
+      for (let date = range.from; date <= range.to; date = addDays(date, 1)) {
+        if ((await daily.getFraming(userId, date)).minimumMode) dates.push(date);
+      }
+      return dates;
+    },
+
     async listFocusSessions(userId, localDate) {
       return [...state.focus.entries()]
         .filter(([mapKey]) => mapKey.startsWith(`${userId}::`))
@@ -413,6 +437,7 @@ export function createMemoryRepository(
           ...exportFlexibility(userId),
           ...exportNutrition(userId),
           ...exportPrograms(userId),
+          ...exportNotifications(userId),
         },
       };
     },
@@ -428,6 +453,7 @@ export function createMemoryRepository(
       deleteFlexibility(userId);
       deleteNutrition(userId);
       deletePrograms(userId);
+      deleteNotifications(userId);
     },
   };
 }

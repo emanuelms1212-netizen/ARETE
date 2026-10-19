@@ -10,8 +10,6 @@ export const metadata: Metadata = { title: 'Settings' };
 const plannedSections: readonly { name: string; stage: string }[] = [
   { name: 'Profile and preferences', stage: 'stage 5' },
   { name: 'Modules, including opt-in safety modules', stage: 'stage 13' },
-  { name: 'Notifications', stage: 'stage 12' },
-  { name: 'Data — export and delete', stage: 'stage 13' },
 ];
 
 export default function SettingsPage() {
@@ -38,6 +36,18 @@ export default function SettingsPage() {
           In demo mode the app reads a fixed, deterministic sample through the same repository
           interface real data will use. No account exists yet and nothing is written anywhere.
         </p>
+      </Section>
+
+      <Section title="Notifications" hint="Quiet by default: times, quiet hours, a daily limit.">
+        <Link href="/settings/notifications" className="text-body text-accent hover:underline">
+          Notification settings
+        </Link>
+      </Section>
+
+      <Section title="Your data" hint="Download everything, or delete your account.">
+        <Link href="/settings/data" className="text-body text-accent hover:underline">
+          Export or delete
+        </Link>
       </Section>
 
       <Section title="Programmes" hint="The 60-Day Reset, contrast therapy and the journal.">

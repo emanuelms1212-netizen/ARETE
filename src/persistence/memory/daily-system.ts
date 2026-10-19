@@ -21,6 +21,7 @@ import {
   RecordNotFoundError,
   type DayFraming,
   type DayReview,
+  type FocusSession as FocusSessionRecord,
   type GoalDetail,
   type GoalInput,
   type GoalReview,
@@ -46,6 +47,11 @@ import {
  * seed producing the same screen.
  */
 export interface DayAccess {
+  /**
+   * A finished timer, as the record the SQL adapter keeps in the same table,
+   * so both adapters answer `listFocusSessions` the same way.
+   */
+  onFocusFinished?(userId: string, session: FocusSessionRecord): void;
   getDay(userId: string, localDate: IsoDate): Day | undefined;
   requireDay(userId: string, localDate: IsoDate): Day;
   saveDay(userId: string, day: Day): Day;
@@ -68,6 +74,7 @@ export function createMemoryDailySystem(access: DayAccess) {
   const habits = new Map<string, Map<string, { habit: Habit; schedule: Recurrence | null }>>();
   const habitLogs = new Map<string, Map<string, HabitLog>>();
   const framings = new Map<string, DayFraming>();
+  const focusStarts = new Map<string, { localDate: IsoDate; clientToken: string }>();
   const reviews = new Map<string, DayReview>();
   const focus = new Map<string, FocusTimerSession>();
   const focusTokens = new Map<string, string>();
@@ -846,6 +853,7 @@ export function createMemoryDailySystem(access: DayAccess) {
 
       focus.set(userId, session);
       focusTokens.set(`${userId}::${input.clientToken}`, session.id);
+      focusStarts.set(session.id, { localDate: input.localDate, clientToken: input.clientToken });
       return session;
     },
 
@@ -891,6 +899,18 @@ export function createMemoryDailySystem(access: DayAccess) {
         reflection: input.reflection ?? null,
       };
       focus.set(userId, updated);
+      const start = focusStarts.get(session.id);
+      if (start) {
+        access.onFocusFinished?.(userId, {
+          id: updated.id,
+          localDate: start.localDate,
+          plannedMinutes: updated.plannedMinutes,
+          actualSeconds: updated.accumulatedSeconds,
+          interruptions: updated.interruptions,
+          status: input.status,
+          clientToken: start.clientToken,
+        });
+      }
       return updated;
     },
   };

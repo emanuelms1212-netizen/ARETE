@@ -40,12 +40,12 @@ export const EVENING_PROMPTS = {
 } as const;
 
 export const WEEKLY_PROMPTS = [
-  { key: 'noticed', text: 'Looking at the week as it actually went, what do I notice?' },
-  {
-    key: 'control',
-    text: 'What was in my control that I let slide, and what was not that I worried about?',
-  },
-  { key: 'next', text: 'One thing to keep, and one thing to change, next week.' },
+  { key: 'moved', text: 'What moved forward?' },
+  { key: 'friction', text: 'What created friction?' },
+  { key: 'reduce', text: 'What should be reduced?' },
+  { key: 'maintain', text: 'What should be kept as it is?' },
+  { key: 'increase', text: 'What deserves a little more?' },
+  { key: 'outcomes', text: 'Next week’s top outcomes — three at most.' },
 ] as const;
 export type WeeklyPromptKey = (typeof WEEKLY_PROMPTS)[number]['key'];
 

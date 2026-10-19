@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getCurrentUser } from '@/auth';
+import { WeekProposalForm } from '@/components/reflect/week-proposal';
 import { WeeklyReviewForm } from '@/components/reflect/weekly-review';
 import { EmptyState, PageHeader, Section } from '@/components/ui';
 import {
@@ -14,7 +15,7 @@ import {
 } from '@/domain';
 import { withUser } from '@/persistence';
 import { resolveCurrentDay } from '../current-day';
-import { saveWeeklyReviewAction } from './actions';
+import { confirmProposalAction, saveWeeklyReviewAction } from './actions';
 import { loadReflectContext } from './context';
 
 export const metadata: Metadata = { title: 'Journal' };
@@ -105,6 +106,14 @@ export default async function ReflectPage({
         answers={data.answers}
         onSave={saveWeeklyReviewAction}
       />
+
+      {data.proposal ? (
+        <WeekProposalForm
+          days={data.proposal.days}
+          unplaced={data.proposal.unplaced}
+          onConfirm={confirmProposalAction}
+        />
+      ) : null}
 
       <Section title="The week’s pages">
         {data.journal.length === 0 ? (

@@ -2712,20 +2712,20 @@ export function describeRepositoryContract(
         await repository.saveWeeklyReview(userId, {
           weekStart: START,
           timeZone: ZONE,
-          answers: { noticed: 'Mornings went well.', next: 'Keep the walk.' },
+          answers: { moved: 'Mornings went well.', outcomes: 'Keep the walk.' },
         });
         expect(await repository.getWeeklyReview(userId, START)).toEqual({
-          noticed: 'Mornings went well.',
-          next: 'Keep the walk.',
+          moved: 'Mornings went well.',
+          outcomes: 'Keep the walk.',
         });
         await repository.saveWeeklyReview(userId, {
           weekStart: START,
           timeZone: ZONE,
-          answers: { noticed: '', control: 'Worried about the weather.' },
+          answers: { moved: '', friction: 'Worried about the weather.' },
         });
         expect(await repository.getWeeklyReview(userId, START)).toEqual({
-          control: 'Worried about the weather.',
-          next: 'Keep the walk.',
+          friction: 'Worried about the weather.',
+          outcomes: 'Keep the walk.',
         });
         expect(await repository.getWeeklyReview(userId, '2026-03-09')).toEqual({});
       });
@@ -2769,6 +2769,124 @@ export function describeRepositoryContract(
         expect(await repository.getSafetyAcknowledgement(userId, 'contrast_therapy')).toBeNull();
         await repository.deleteContrastSessions(userId);
         expect(await repository.listContrastSessions(userId, { from: DAY, to: DAY })).toEqual([]);
+      });
+    });
+
+    describe('progress and notifications', () => {
+      it('lists finished focus timers by range, as the SQL table does', async () => {
+        const { repository, userId } = await fresh();
+        await repository.startFocusSession(userId, {
+          localDate: DAY,
+          timeZone: ZONE,
+          plannedMinutes: 25,
+          kind: 'work',
+          startedAt: new Date('2026-03-16T09:00:00Z'),
+          clientToken: 'focus-progress-1',
+        });
+        await repository.finishFocusSession(userId, {
+          at: new Date('2026-03-16T09:20:00Z'),
+          status: 'completed',
+        });
+        const between = await repository.listFocusSessionsBetween(userId, {
+          from: '2026-03-10',
+          to: '2026-03-20',
+        });
+        expect(between).toHaveLength(1);
+        expect(between[0]).toMatchObject({
+          localDate: DAY,
+          actualSeconds: 1200,
+          status: 'completed',
+        });
+        expect(await repository.listFocusSessions(userId, DAY)).toHaveLength(1);
+        expect(
+          await repository.listFocusSessionsBetween(userId, {
+            from: '2026-03-17',
+            to: '2026-03-20',
+          }),
+        ).toEqual([]);
+      });
+
+      it('lists the days run at the minimum', async () => {
+        const { repository, userId } = await fresh();
+        await repository.setMinimumMode(userId, {
+          localDate: DAY,
+          timeZone: ZONE,
+          on: true,
+          at: new Date(),
+        });
+        await repository.setMinimumMode(userId, {
+          localDate: '2026-03-17',
+          timeZone: ZONE,
+          on: true,
+          at: new Date(),
+        });
+        await repository.setMinimumMode(userId, {
+          localDate: '2026-03-17',
+          timeZone: ZONE,
+          on: false,
+          at: new Date(),
+        });
+        expect(
+          await repository.listMinimumDays(userId, { from: '2026-03-01', to: '2026-03-31' }),
+        ).toEqual([DAY]);
+      });
+
+      it('keeps notification settings off by default, and saves the person’s own', async () => {
+        const { repository, userId } = await fresh();
+        const defaults = await repository.getNotificationPreferences(userId);
+        expect(defaults).toMatchObject({
+          morningPlanAt: null,
+          eveningReviewAt: null,
+          modules: {},
+          dailyCap: 2,
+          quietStart: '22:00',
+          quietEnd: '07:00',
+          sacredEnabled: false,
+        });
+        const saved = await repository.saveNotificationPreferences(userId, {
+          ...defaults,
+          morningPlanAt: '08:15',
+          modules: { today: true },
+          dailyCap: 3,
+          sacredEnabled: true,
+          sacredAt: '18:00',
+          sacredText: 'Evening prayer',
+          autoMuted: ['open_items'],
+        });
+        expect(await repository.getNotificationPreferences(userId)).toEqual(saved);
+      });
+
+      it('records what happened to each reminder, on its local day', async () => {
+        const { repository, userId } = await fresh();
+        await repository.recordNotificationEvent(userId, {
+          localDate: DAY,
+          timeZone: ZONE,
+          key: 'bundle',
+          kind: 'open_items',
+          action: 'snoozed',
+          snoozedUntil: '2026-03-16T13:30:00.000Z',
+        });
+        await repository.recordNotificationEvent(userId, {
+          localDate: DAY,
+          timeZone: ZONE,
+          key: 'bundle',
+          kind: 'open_items',
+          action: 'done',
+          snoozedUntil: null,
+        });
+        await expect(
+          repository.recordNotificationEvent(userId, {
+            localDate: DAY,
+            timeZone: ZONE,
+            key: 'x',
+            kind: 'open_items',
+            action: 'snoozed',
+            snoozedUntil: null,
+          }),
+        ).rejects.toThrow(/snooze needs a time/);
+        const events = await repository.listNotificationEvents(userId, { from: DAY, to: DAY });
+        expect(events.map((event) => event.action)).toEqual(['snoozed', 'done']);
+        expect(events[0]?.snoozedUntil).toBe('2026-03-16T13:30:00.000Z');
       });
     });
 

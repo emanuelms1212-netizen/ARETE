@@ -255,6 +255,15 @@ export function createSqlFlexibility(executor: SqlExecutor) {
       return toEnrolment(result.rows[0]!);
     },
 
+    async listFlexSessionsBetween(userId: string, range: { from: string; to: string }) {
+      const result = await executor.query<SessionRow>(
+        `select ${SESSION_COLUMNS} from public.flexibility_sessions
+          where user_id = $1 and local_date between $2 and $3 order by started_at`,
+        [userId, range.from, range.to],
+      );
+      return result.rows.map(toSession);
+    },
+
     async listFlexSessions(userId: string, enrolmentId: string) {
       const result = await executor.query<SessionRow>(
         `select ${SESSION_COLUMNS} from public.flexibility_sessions

@@ -154,6 +154,13 @@ export function createMemoryFlexibility() {
       return replaceEnrolment(userId, { ...current, status, endedAt: at.toISOString() });
     },
 
+    async listFlexSessionsBetween(userId: string, range: { from: string; to: string }) {
+      return state(userId)
+        .sessions.filter((entry) => entry.localDate >= range.from && entry.localDate <= range.to)
+        .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
+        .map((entry) => structuredClone(entry));
+    },
+
     async listFlexSessions(userId: string, enrolmentId: string) {
       return state(userId)
         .sessions.filter((entry) => entry.enrolmentId === enrolmentId)

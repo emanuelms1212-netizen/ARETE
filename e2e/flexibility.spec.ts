@@ -23,16 +23,22 @@ async function stopAnyRunningSession(page: Page) {
 
 async function freshProgramme(page: Page) {
   await page.goto('/train/flexibility');
+  // Wait for hydration: a click on a server-rendered button before React is
+  // attached does nothing, which made this helper flaky.
+  await page.waitForLoadState('networkidle');
   await stopAnyRunningSession(page);
   const end = page.getByRole('button', { name: /^(End the programme|Finish and start again)$/ });
-  if (await end.isVisible()) {
-    await end.click();
-    await page
-      .getByRole('dialog')
-      .getByRole('button', { name: /^(End the programme|Finish)$/ })
-      .click();
-  }
-  await expect(page.getByRole('button', { name: 'Next: a quick baseline' })).toBeVisible();
+  const baseline = page.getByRole('button', { name: 'Next: a quick baseline' });
+  await expect(async () => {
+    if (await end.isVisible()) {
+      await end.click();
+      await page
+        .getByRole('dialog')
+        .getByRole('button', { name: /^(End the programme|Finish)$/ })
+        .click({ timeout: 2_000 });
+    }
+    await expect(baseline).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
 }
 
 /** Works through whatever movements are left in the running session. */

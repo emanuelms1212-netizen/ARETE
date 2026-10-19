@@ -915,7 +915,58 @@ travel; and the three Today metrics wrapped 2-then-1, so they became a three-col
 - [ ] **Backfilling reset items for past days** — today only for now
 - [ ] **Migrations applied to a hosted database** — still no Supabase project.
 
-## Stages 12–17 — not started
+## Stage 12 — Progress, the weekly review and quiet notifications
 
-Tracked in `docs/PROJECT_LEDGER.md` §8. No item below stage 12 may be ticked before the
+### Progress
+
+- [x] Weekly consistency, focus time, goal milestones, training volume and cardio time,
+      flexibility sessions, meditation and breathing minutes, drill history, nutrition trends
+- [x] Separate metrics per module and a plain-language narrative — no combined score (D107)
+- [x] Streaks shown beside rolling consistency, so a missed day does not erase context (D108)
+- [x] Observations labelled as observational, needing 21 days and seven on each side, and
+      never causal — tested for causal words (D109)
+- [x] Date ranges (7, 28, 90 days), export of the range, and links to export-all and delete (D116)
+
+### Weekly review
+
+- [x] What moved forward, what created friction, what to reduce, keep or increase, and next
+      week's top outcomes
+- [x] A proposed next week from unfinished tasks, habits, workouts and recovery — nothing
+      added until the person ticks and confirms (D115)
+
+### Notifications
+
+- [x] Quiet hours, per-module switches, a daily cap, bundled low-priority reminders (D111)
+- [x] Actionable snooze and done where supported; dismissal, with auto-mute after two days (D113)
+- [x] Time zone and travel handling, including a daylight-saving morning (D114)
+- [x] No guilt, scarcity or urgency — every template tested against a banned-words list
+- [x] Practice reminders off unless enabled, in the person's own words only (D112)
+
+### Acceptance, as the prompt states it
+
+- [x] **Charts have text summaries and accessible labels** — names, descriptions, tooltips and
+      a table view, checked in a browser (D110)
+- [x] **Empty and insufficient-data states are honest** — "Nothing recorded in this range",
+      "Patterns need at least 21 days"
+- [x] **Notification cap and quiet hours are tested** — unit tests and in a browser
+- [x] **Exports contain the expected user's data only** — the user from the session, rows
+      within the range; RLS in live mode
+
+### Verification
+
+- [x] `npm test` — **1176** unit, component and database tests
+- [x] `npm run e2e` — **204** end-to-end tests (27 skipped by design, D76), run twice against a
+      freshly started server; new pages fail the run on any console error
+- [x] Format, lint, typecheck and build all clean
+- [x] Screenshots inspected at 390×844 and 1440×900 — Progress, notification settings, data
+      controls and the weekly proposal
+
+### Not done, and why
+
+- [ ] **Push notifications to the phone** — needs the service worker and keys (later stage)
+- [ ] **Migrations applied to a hosted database** — still no Supabase project.
+
+## Stages 13–17 — not started
+
+Tracked in `docs/PROJECT_LEDGER.md` §8. No item below stage 13 may be ticked before the
 stage that builds it has run and been verified.
