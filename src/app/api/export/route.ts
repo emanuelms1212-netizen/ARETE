@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getCurrentUser } from '@/auth';
 import { daysBetween, exportForRange } from '@/domain';
+import { takeToken } from '@/lib/rate-limit';
 import { withUser } from '@/persistence';
 
 export const dynamic = 'force-dynamic';
@@ -25,7 +26,19 @@ export async function GET(request: NextRequest) {
     range = { from, to };
   }
 
-  const exported = await withUser(user.id, (repository) => repository.exportEverything(user.id));
+  const allowed = takeToken('export', user.id);
+  if (!allowed.ok) {
+    return NextResponse.json(
+      { error: 'Several exports in a row. Try again shortly.' },
+      { status: 429, headers: { 'retry-after': String(allowed.retryAfterSeconds) } },
+    );
+  }
+
+  const exported = await withUser(user.id, async (repository) => {
+    const everything = await repository.exportEverything(user.id);
+    await repository.recordAudit(user.id, { action: 'export', detail: range ? 'range' : 'all' });
+    return everything;
+  });
   const body = {
     exportedAt: new Date().toISOString(),
     schemaVersion: exported.schemaVersion,

@@ -13,7 +13,12 @@ import {
 } from '@/components/onboarding/steps';
 import { ONBOARDING_STEPS, type OnboardingStep } from '@/domain';
 import { CONTENT_PACKS, withUser } from '@/persistence';
-import { acceptDraftAction, saveStepAction, skipStepAction } from '../actions';
+import {
+  acceptDraftAction,
+  saveHealthFromSettingsAction,
+  saveStepAction,
+  skipStepAction,
+} from '../actions';
 import { ensureDraftWeek } from '../draft';
 
 export const dynamic = 'force-dynamic';
@@ -24,10 +29,13 @@ function isStep(value: string): value is OnboardingStep {
 
 export default async function OnboardingStepPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ step: string }>;
+  searchParams: Promise<{ from?: string }>;
 }) {
   const { step } = await params;
+  const { from } = await searchParams;
   if (!isStep(step)) notFound();
 
   const user = await getCurrentUser();
@@ -41,10 +49,17 @@ export default async function OnboardingStepPage({
     return <ReviewWeek week={latest.draft} onAccept={acceptDraftAction} />;
   }
 
+  // Changing health answers from Settings returns to Settings, not to the next step.
+  const fromSafety = step === 'health' && from === 'safety';
   const props = {
     profile: state.profile,
-    onSave: saveStepAction.bind(null, step),
-    onSkip: skipStepAction.bind(null, step),
+    onSave: fromSafety ? saveHealthFromSettingsAction : saveStepAction.bind(null, step),
+    onSkip: fromSafety
+      ? async () => {
+          'use server';
+          redirect('/settings/safety');
+        }
+      : skipStepAction.bind(null, step),
   };
 
   switch (step) {

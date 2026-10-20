@@ -33,12 +33,25 @@ export async function saveStepAction(step: string, answers: unknown): Promise<vo
   if (!isAnswerableStep(step)) throw new Error(`Not a step that takes answers: ${step}`);
   const user = await requireUser();
 
-  await withUser(user.id, (repository) =>
-    repository.saveStep(user.id, step satisfies AnswerableStep, answers),
-  );
+  await withUser(user.id, async (repository) => {
+    await repository.saveStep(user.id, step satisfies AnswerableStep, answers);
+    if (step === 'health')
+      await repository.recordAudit(user.id, { action: 'health_answers_changed', detail: null });
+  });
 
   revalidatePath('/onboarding', 'layout');
   redirect(`/onboarding/${nextStep(step) ?? 'review'}`);
+}
+
+/** The health step, opened from Settings: saves and goes back to the safety overview. */
+export async function saveHealthFromSettingsAction(answers: unknown): Promise<void> {
+  const user = await requireUser();
+  await withUser(user.id, async (repository) => {
+    await repository.saveStep(user.id, 'health', answers);
+    await repository.recordAudit(user.id, { action: 'health_answers_changed', detail: null });
+  });
+  revalidatePath('/', 'layout');
+  redirect('/settings/safety');
 }
 
 export async function skipStepAction(step: string): Promise<void> {

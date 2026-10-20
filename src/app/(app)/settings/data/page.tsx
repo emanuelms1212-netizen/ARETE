@@ -35,7 +35,12 @@ export default function DataPage() {
           Download everything
         </a>
         <p className="mt-2 text-body-sm text-ink-muted">
-          For a date range, use Export on the Progress page.
+          For a date range, use Export on the Progress page. To delete just one part, such as the
+          journal or the food log, use{' '}
+          <Link href="/settings/privacy" className="text-accent underline underline-offset-2">
+            Privacy
+          </Link>
+          .
         </p>
       </Section>
       <Section title="Delete" hint="Immediate and complete. There is no queue and no recovery.">

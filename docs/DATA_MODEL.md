@@ -60,6 +60,7 @@ duplicate. A focus session recorded three times is one row.
 | `0017_nutrition`              | `hydration_logs`, `oil_awareness`; food settings on `nutrition_profile`; fibre, water and clinician flag on `nutrition_targets`; recipes, favourites and sources on `foods`                                            |
 | `0018_programs_reflection`    | `reset_enrolments`, `reset_breaks`, `reset_logs`, `reset_checkins`, `contrast_screenings`, `contrast_sessions`; `virtue` and `obstacle` on `daily_plans`, `learned` on `day_reviews`; one weekly-review row per prompt |
 | `0019_progress_notifications` | `notification_events`; module switches, daily cap, bundling and the practice reminder on `notification_preferences`                                                                                                    |
+| `0020_trust`                  | `audit_events` (append-only, what and when, never content); `delete_my_feature()`; `prune_audit_events()`; `user_owned_tables()` gains `audit_events`                                                                  |
 
 `daily_plan_items` is the one table not in the brief's list. A `daily_plans` row on its own
 cannot represent a day; this is the commitment the Today screen renders.
@@ -89,6 +90,9 @@ Not "is a policy present" but "does it hold":
 - An unauthenticated session sees nothing at all.
 - Library content is readable but not writable.
 - No table in `public` is missing RLS, FORCE, or a policy.
+- Every table with a `user_id` is in `user_owned_tables()`, and every one of them has a policy
+  scoped to `current_user_id()` (stage 13).
+- The audit trail cannot be updated or deleted by its owner, only read and appended to.
 
 ## 3a. The one rule the schema is the enforcement point for
 
@@ -150,6 +154,16 @@ read someone else's data.
 guarantees the cascade reaches every table and that row is not the caller's to delete. It
 takes its subject from `current_user_id()` and never from an argument, so it cannot be aimed
 at anyone else. One delete removes the account and everything attached to it.
+
+`delete_my_feature(feature)` deletes one part of the account — journal, food, body, training,
+flexibility, mind, focus, programmes, health or reminder history (`src/domain/data-features.ts`
+says exactly which rows each covers). **SECURITY INVOKER**, so RLS applies, and the subject is
+always `current_user_id()`.
+
+`audit_events` records that an export, a deletion, a health-answer change, a contrast screening
+or a safety acknowledgement happened, and when — never what it contained. `detail` must match
+`^[a-z0-9_:-]{1,64}$`. The owner may select and insert, not update or delete; the account
+deletion cascade removes it. `prune_audit_events()` removes rows older than 400 days.
 
 `user_owned_tables()` lists what export covers. Adding a user-owned table without adding it
 there is a bug, and it is the kind of bug that quietly loses someone's data on export.

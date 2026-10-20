@@ -2,7 +2,6 @@ import { EXERCISES } from '@/content/train/exercises';
 import {
   availabilityFor,
   decisionFor,
-  evaluateSafety,
   generateTrainingPlan,
   recentSessionCount,
   suggestedSetup,
@@ -14,6 +13,7 @@ import {
   type TrainingSetup,
   type WorkoutSession,
 } from '@/domain';
+import { loadEligibility } from '../eligibility';
 import type { AreteRepository } from '@/persistence/repository';
 
 /**
@@ -39,13 +39,14 @@ export async function loadTrainContext(
   userId: string,
   localDate: string,
 ): Promise<TrainContext> {
-  const [setup, onboarding, history] = await Promise.all([
+  const [setup, onboarding, history, decided] = await Promise.all([
     repository.getTrainingSetup(userId),
     repository.getOnboarding(userId),
     repository.listWorkouts(userId, { limit: 40 }),
+    loadEligibility(repository, userId, localDate),
   ]);
   const { profile } = onboarding;
-  const safety = evaluateSafety(profile, localDate);
+  const safety = decided.report;
 
   const planContext: PlanContext = {
     excludedRegions: safety.excludedRegions,

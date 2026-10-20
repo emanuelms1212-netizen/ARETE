@@ -2,7 +2,15 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import { CheckIcon } from '@/components/icons';
-import { Button, Dialog, FormField, TextArea, TextInput, useToast } from '@/components/ui';
+import {
+  Button,
+  Dialog,
+  FormField,
+  TextArea,
+  TextInput,
+  useToast,
+  StopGuidance,
+} from '@/components/ui';
 import {
   BLOCK_LABEL,
   restRemaining,
@@ -506,6 +514,7 @@ export function WorkoutRunner({
           Stop here
         </Button>
       </div>
+      <StopGuidance module="workout" />
 
       <Dialog open={guided !== null} onClose={() => setGuide(null)} title={guided?.name ?? ''}>
         {guided ? <ExerciseGuide exercise={guided} headingLevel={3} /> : null}
@@ -556,6 +565,11 @@ export function WorkoutRunner({
             : 'What you logged is kept. Stopping when you need to is part of training.'
         }
       >
+        {ending === 'abandoned' ? (
+          <div className="mb-4">
+            <StopGuidance module="workout" summary="Stopping because you feel unwell?" open />
+          </div>
+        ) : null}
         <form
           className="space-y-4"
           onSubmit={(event) => {

@@ -1,7 +1,15 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Button, ChoiceList, FormField, Section, TextArea, useToast } from '@/components/ui';
+import {
+  Button,
+  ChoiceList,
+  FormField,
+  Section,
+  StopGuidance,
+  TextArea,
+  useToast,
+} from '@/components/ui';
 import { EVENING_PROMPTS, type DayProgress } from '@/domain';
 
 /**
@@ -165,6 +173,9 @@ export function EveningReview({ progress, existing, onSave }: EveningReviewProps
           {saved ? 'Update the review' : 'Save the review'}
         </Button>
       </form>
+      <div className="mt-4">
+        <StopGuidance module="journal" summary="If writing brings up something heavy" />
+      </div>
     </Section>
   );
 }

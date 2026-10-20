@@ -47,6 +47,13 @@ export function createMemoryNotifications() {
       };
     },
 
+    forgetEvents(userId: string) {
+      events.delete(userId);
+      // Automatic mutes come from dismissals; with the history gone, so are they.
+      const current = preferences.get(userId);
+      if (current) preferences.set(userId, { ...current, autoMuted: [] });
+    },
+
     deleteNotifications(userId: string) {
       preferences.delete(userId);
       events.delete(userId);

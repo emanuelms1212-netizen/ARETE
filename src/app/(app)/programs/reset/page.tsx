@@ -79,6 +79,7 @@ export default async function ResetPage() {
         lastSummary={data.lastSummary}
         contrastAvailable={data.contrastAvailable}
         coldAcknowledged={data.coldAcknowledged}
+        coldUnavailable={data.cold.kind === 'unavailable' ? data.cold.reason : null}
         actions={actions}
       />
     </div>

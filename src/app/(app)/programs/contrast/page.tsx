@@ -48,6 +48,7 @@ export default async function ContrastPage() {
         screening={data.screening}
         eligibility={data.eligibility}
         minor={data.minor}
+        offered={data.offered}
         hints={data.hints}
         sessions={data.sessions}
         actions={actions}

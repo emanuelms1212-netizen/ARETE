@@ -6,8 +6,7 @@ import {
   calculateTargets,
   dayTotals,
   daysBetween,
-  isMinor,
-  nutritionSafeguards,
+  eligibility,
   restingEnergy,
   rollingAverage,
   targetsFromOverride,
@@ -158,13 +157,19 @@ export async function loadFoodContext(
   ]);
 
   const birthYear = settings.birthYear ?? onboarding.profile.age.birthYear ?? null;
-  const safeguards = nutritionSafeguards({
-    isMinor: isMinor(birthYear ?? undefined, today),
-    guardianConfirmed: onboarding.profile.age.guardianConfirmed,
-    pregnancyStatus: onboarding.profile.health.pregnancyStatus,
-    eatingDisorderCaution: settings.eatingDisorderCaution,
-    prescribedDiet: settings.prescribedDiet,
-  });
+  // The same central rules every module uses (see domain/eligibility.ts).
+  const safeguards = eligibility({
+    today,
+    profile: onboarding.profile,
+    painFlags: [],
+    nutrition: {
+      birthYear: settings.birthYear,
+      eatingDisorderCaution: settings.eatingDisorderCaution,
+      prescribedDiet: settings.prescribedDiet,
+    },
+    contrastScreening: null,
+    acknowledgements: { cold_exposure: null, contrast_therapy: null },
+  }).nutrition;
 
   const latestWeight = weights.at(-1) ?? null;
   const trendFrom = addDays(today, -90);

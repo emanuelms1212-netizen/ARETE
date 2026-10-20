@@ -11,7 +11,7 @@ export function Skeleton({ className = '', ...props }: ComponentProps<'div'>) {
   return (
     <div
       aria-hidden="true"
-      className={`animate-skeleton rounded-md bg-sunken ${className}`}
+      className={`animate-skeleton max-w-full rounded-md bg-sunken ${className}`}
       {...props}
     />
   );

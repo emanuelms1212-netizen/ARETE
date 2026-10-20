@@ -156,6 +156,7 @@ export {
   pausePatch,
   presetBySlug,
   resumePatch,
+  timerAnnouncement,
   timerView,
 } from './focus';
 export type { FocusKind, FocusPreset, FocusSession, FocusStatus, TimerView } from './focus';
@@ -212,3 +213,6 @@ export * from './progress';
 export * from './notifications';
 export * from './export';
 export * from './week-proposal';
+export * from './eligibility';
+export * from './stop-guidance';
+export * from './data-features';

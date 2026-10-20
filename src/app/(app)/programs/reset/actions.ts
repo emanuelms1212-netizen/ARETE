@@ -76,6 +76,8 @@ export async function startResetAction(input: {
     const ahead = daysBetween(today, input.startedOn);
     if (ahead < 0 || ahead > 28)
       return { ok: false, message: 'Start today or within the next four weeks.' };
+    if (customisation.data.enabled.cold && context.cold.kind === 'unavailable')
+      return { ok: false, message: context.cold.reason };
     if (customisation.data.enabled.cold && !context.coldAcknowledged)
       return { ok: false, message: 'Read the cold-water note before turning that on.' };
     return {
@@ -97,6 +99,8 @@ export async function updateResetAction(
     return { ok: false, message: firstIssue(parsed.error, 'Check the settings.') };
   return run(async (repository, { userId }, context) => {
     if (!context.enrolment) return { ok: false, message: NOT_RUNNING };
+    if (parsed.data.enabled.cold && context.cold.kind === 'unavailable')
+      return { ok: false, message: context.cold.reason };
     if (parsed.data.enabled.cold && !context.coldAcknowledged)
       return { ok: false, message: 'Read the cold-water note before turning that on.' };
     if (!parsed.data.includeExtension && context.enrolment.customisation.includeExtension) {
@@ -116,6 +120,10 @@ export async function acknowledgeColdAction(): Promise<ResetResult<null>> {
       topic: 'cold_exposure',
       version: COLD_NOTICE_VERSION,
       at: new Date(),
+    });
+    await repository.recordAudit(userId, {
+      action: 'safety_acknowledged',
+      detail: 'cold_exposure',
     });
     return { ok: true, value: null };
   });

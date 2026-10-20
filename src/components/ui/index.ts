@@ -12,6 +12,7 @@ export { ListRow, StatusDot } from './list-row';
 export { Metric } from './metric';
 export { PageHeader } from './page-header';
 export { SafetyNotice } from './safety-notice';
+export { StopGuidance } from './stop-guidance';
 export { Section } from './section';
 export { SegmentedControl } from './segmented-control';
 export { Skeleton, SkeletonText } from './skeleton';

@@ -233,3 +233,22 @@ describe('presets and links', () => {
     expect(describeLink(session())).toBe('Unlinked');
   });
 });
+
+describe('timer announcements', () => {
+  it('changes only every five minutes, then for the last minute and the end', async () => {
+    const { timerAnnouncement } = await import('./focus');
+    const heard = new Set<string>();
+    for (let seconds = 25 * 60; seconds >= 0; seconds -= 1) heard.add(timerAnnouncement(seconds));
+    // 25, 20, 15, 10, 5 minutes, the last minute, and the end: seven things in 25 minutes.
+    expect([...heard]).toEqual([
+      'About 25 minutes remaining.',
+      'About 20 minutes remaining.',
+      'About 15 minutes remaining.',
+      'About 10 minutes remaining.',
+      'About 5 minutes remaining.',
+      'Less than a minute remaining.',
+      'Time is up.',
+    ]);
+    expect(timerAnnouncement(0, 30)).toBe('Time is up.');
+  });
+});

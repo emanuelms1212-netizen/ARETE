@@ -11,6 +11,32 @@ import { z } from 'zod';
  */
 const base = z.object({});
 
+/**
+ * Modules an event may name. Deliberately excludes anything that would reveal
+ * health, injury, food or religious information by its name alone: no
+ * "contrast_therapy", no "cold", no "sacred", no "food". Those are never
+ * reported, even as an on/off switch.
+ */
+export const ANALYTICS_MODULES = [
+  'focus',
+  'habits',
+  'plan',
+  'mind',
+  'training',
+  'flexibility',
+  'reset',
+] as const;
+
+/** Reminder kinds an event may name: the religious reminder is never one of them. */
+export const ANALYTICS_REMINDER_KINDS = [
+  'morning_plan',
+  'evening_review',
+  'open_items',
+  'training_day',
+  'program_day',
+  'weekly_review',
+] as const;
+
 export const analyticsEventSchemas = {
   onboarding_step_completed: base.extend({ step: z.int().min(0) }),
   day_committed: base.extend({ commitmentCount: z.int().min(0), minimumCount: z.int().min(0) }),
@@ -28,16 +54,15 @@ export const analyticsEventSchemas = {
     practice: z.enum(['meditation', 'breathwork', 'cognitive']),
     minutes: z.int().min(0),
   }),
-  food_entry_created: base.extend({ hasMacros: z.boolean() }),
   day_marked: base.extend({ mark: z.enum(['normal', 'travel', 'not-today']) }),
   day_review_completed: base.extend({ completionRatio: z.number().min(0).max(1) }),
   week_review_completed: base.extend({ activeDays: z.int().min(0).max(7) }),
   program_started: base.extend({ programId: z.string(), edited: z.boolean() }),
   program_adjusted: base.extend({ programId: z.string() }),
   program_paused: base.extend({ programId: z.string() }),
-  module_enabled: base.extend({ moduleId: z.string() }),
-  module_disabled: base.extend({ moduleId: z.string() }),
-  notification_muted: base.extend({ kind: z.string() }),
+  module_enabled: base.extend({ moduleId: z.enum(ANALYTICS_MODULES) }),
+  module_disabled: base.extend({ moduleId: z.enum(ANALYTICS_MODULES) }),
+  notification_muted: base.extend({ kind: z.enum(ANALYTICS_REMINDER_KINDS) }),
   data_exported: base,
 } as const;
 

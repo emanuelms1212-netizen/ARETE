@@ -11,6 +11,7 @@ import {
   Switch,
   TextArea,
   useToast,
+  StopGuidance,
 } from '@/components/ui';
 import { MannequinPlayer } from '@/components/train/mannequin-player';
 import { flexMovement } from '@/content/flexibility/hamstring';
@@ -372,6 +373,7 @@ export function FlexPlayer({
       >
         Stop — sharp, radiating or worsening pain
       </Button>
+      <StopGuidance module="flexibility" />
 
       {record.warmup === null ? (
         <section

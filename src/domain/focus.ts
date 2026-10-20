@@ -192,3 +192,18 @@ export function describeLink(session: FocusSession): string {
   if (session.goalTitleSnapshot !== null) return session.goalTitleSnapshot;
   return 'Unlinked';
 }
+
+/**
+ * What a screen reader hears about a running timer.
+ *
+ * A live region that held the clock would be read out every second. This
+ * changes only every five minutes, then once for the last minute and once at
+ * the end — often enough to know where you are, rarely enough to ignore.
+ */
+export function timerAnnouncement(remainingSeconds: number, overtimeSeconds = 0): string {
+  if (overtimeSeconds > 0 || remainingSeconds <= 0) return 'Time is up.';
+  if (remainingSeconds <= 60) return 'Less than a minute remaining.';
+  const minutes = Math.ceil(remainingSeconds / 60);
+  const rounded = Math.ceil(minutes / 5) * 5;
+  return `About ${rounded} minutes remaining.`;
+}

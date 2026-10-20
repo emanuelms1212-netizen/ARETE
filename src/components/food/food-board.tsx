@@ -11,6 +11,7 @@ import {
   SegmentedControl,
   TextInput,
   useToast,
+  StopGuidance,
 } from '@/components/ui';
 import {
   FOOD_SOURCE_LABEL,
@@ -354,7 +355,7 @@ function Meal({
       aria-labelledby={`meal-${slot}`}
       className="rounded-lg border border-line bg-surface p-4"
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id={`meal-${slot}`} className="text-body font-semibold text-ink">
           {MEAL_LABEL[slot]}
         </h2>
@@ -609,6 +610,13 @@ export function DayView(props: DayViewProps) {
         />
       ))}
       <Water logs={props.water} date={date} unitSystem={unitSystem} actions={actions} />
+      <StopGuidance module="food" summary="If food or numbers feel stressful" />
+      <p className="text-body-sm text-ink-muted">
+        <Link href="/train/food?tab=settings" className="text-accent underline underline-offset-2">
+          Hide every number
+        </Link>{' '}
+        in Targets &amp; settings. Meals still log without them.
+      </p>
       {adding ? (
         <AddEntryDialog
           open
@@ -718,7 +726,7 @@ export function WeekView({
                         ? '/train/food?tab=day'
                         : `/train/food?tab=day&date=${day.localDate}`
                     }
-                    className="text-accent hover:underline"
+                    className="text-accent underline underline-offset-2"
                   >
                     {day.localDate === today ? 'Today' : shortDay(day.localDate)}
                   </Link>

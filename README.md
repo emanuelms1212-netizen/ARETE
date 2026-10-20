@@ -12,7 +12,7 @@ Working title. Renaming is a one-line change in `src/lib/app-config.ts`.
 
 ## Status
 
-**Stage 12 of 17 — Progress and quiet notifications.** There is a real schema: 60 tables, row-level security on every one of them, and an authorization test suite
+**Stage 13 of 17 — Safety, privacy, accessibility and trust.** There is a real schema: 61 tables, row-level security on every one of them, and an authorization test suite
 that runs against a real Postgres and actually tries to read another user's data. The app
 reads the signed-in user's own local day through a repository interface with two
 interchangeable implementations.
@@ -62,6 +62,13 @@ and never causal, and an export of the range. The weekly review proposes next we
 tasks, habits, training and recovery, and adds only what the person ticks. Notifications are
 quiet by default: per-module switches, quiet hours, a daily cap, bundling, snooze and done, and
 a practice reminder that is off unless chosen and only ever in the person's own words.
+
+Stage 13 hardened all of it. One module, `domain/eligibility.ts`, decides what every gated
+feature may offer, and the strictest answer wins; Settings → Safety shows each decision and its
+reason. Every screen that asks for effort shows how to stop. Settings → Privacy deletes any one
+part of the account, and an audit trail records sensitive actions without their content. Every
+route is checked with axe, by keyboard, with reduced motion and at 200% text. Release is still
+blocked on clinical and dietitian review (`docs/SAFETY_MATRIX.md`, `docs/THREAT_MODEL.md`).
 
 See `docs/PROJECT_LEDGER.md` for where the build stands and what comes next,
 `docs/DATA_MODEL.md` for the schema and the reasoning behind it,
@@ -139,13 +146,11 @@ database client, and the domain layer never imports React.
 
 ## Routes
 
-| Route                                | State                                                  |
-| ------------------------------------ | ------------------------------------------------------ |
-| `/`                                  | Redirects to `/today`                                  |
-| `/today`                             | Live — reads the demo day through the repository layer |
-| `/plan` `/train` `/mind` `/progress` | Shell with an honest placeholder                       |
-| `/settings`                          | Live — build info and planned sections                 |
-| `/api/health`                        | Build, version and mode. No secrets                    |
+Every destination is live. The full table, with what each route does, is in
+`docs/PROJECT_LEDGER.md` §4: Today, Plan, Train (with exercises, flexibility and food), Mind,
+Progress, Reflect, Programmes (the reset and contrast therapy), onboarding, and Settings
+(notifications, your data, privacy, safety and modules). `/api/export` downloads the signed-in
+person's data; `/api/health` reports build, version and mode, with no secrets.
 
 ## Principles this codebase is held to
 
@@ -171,6 +176,7 @@ database client, and the domain layer never imports React.
 
 ## Privacy
 
-No third-party analytics, no ad SDKs, no session replay. Journal text, reviews, food notes
-and body measurements never appear in an analytics payload — enforced by a schema test, not
-by a convention.
+No third-party analytics, no ad SDKs, no session replay. Journal text, reviews, food, body
+measurements, injuries, health answers and the practice reminder never appear in an analytics
+payload — not even by name — enforced by schema tests, not by a convention. Any part of the
+account can be deleted on its own, or all of it at once. See `docs/PRIVACY.md`.

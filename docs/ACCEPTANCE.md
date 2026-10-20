@@ -966,7 +966,76 @@ travel; and the three Today metrics wrapped 2-then-1, so they became a three-col
 - [ ] **Push notifications to the phone** — needs the service worker and keys (later stage)
 - [ ] **Migrations applied to a hosted database** — still no Supabase project.
 
-## Stages 13–17 — not started
+## Stage 13 — Safety, privacy, accessibility and trust
 
-Tracked in `docs/PROJECT_LEDGER.md` §8. No item below stage 13 may be ticked before the
+### Safety
+
+- [x] Health flags and module eligibility centralised in `domain/eligibility.ts`; every server
+      context loads it once; components only display it (D118)
+- [x] Two contradictions removed: contrast therapy and the Reset's cold finish now honour
+      onboarding answers that rule heat and cold out (THREAT_MODEL F1, F2) — unit tested
+- [x] Visible stop/modify paths for pain, dizziness, chest symptoms, distress, overheating,
+      excessive cold and food or number distress, on the screens that ask for effort (D125)
+- [x] No diagnosis, treatment, supplement prescribing, calorie targets for minors, guaranteed
+      results, IQ claims or causal correlations — a claims scan runs in the suite (D126)
+- [x] Explicit acknowledgement only for the cold finish and contrast therapy; everything else
+      states its limits without a tick (`docs/SAFETY_MATRIX.md` §3)
+
+### Privacy and security
+
+- [x] Authentication and row-level authorisation reviewed; every action resolves the user from
+      the session; automated checks that every owned table is in `user_owned_tables()` and is
+      scoped to `current_user_id()`
+- [x] Input validation reviewed (Zod in every action, constraints in the database)
+- [x] Rate limits on export and deletion (D122); `429` with `Retry-After` on the export API
+- [x] Audit trail of sensitive actions, content-free and append-only (D120)
+- [x] Logs and analytics reviewed: no journal, food, injury, health or religious data, even by
+      name (D121). No files or photos are stored
+- [x] Export and deletion: everything, or one of ten parts (D119); the memory adapter's
+      delete-everything gap fixed and tested (F4)
+- [x] Retention documented (`docs/PRIVACY.md`); a privacy settings screen at `/settings/privacy`
+- [x] Content security policy and the existing security headers on every response (D124)
+
+### Accessibility
+
+- [x] axe (WCAG 2.0/2.1/2.2 A and AA) on every route, both themes, and with a dialog open
+- [x] Keyboard flows: dialogs open and close from the keyboard, the safe choice is focused
+      first, focus returns to the trigger, disclosures open with Enter
+- [x] Modal focus stays in the dialog (native `<dialog>`), checked by tabbing past its controls
+- [x] Timer announcements are not noisy: every five minutes, the last minute and the end (D123)
+- [x] Text scaling: 200% text causes no sideways scroll on the main screens
+- [x] Colour contrast (token tests and axe), reduced motion (no element animates under
+      `prefers-reduced-motion`), touch targets (≥ 24 px; controls are 44 px by design)
+- [x] Captions and text alternatives: every animation has a still, captioned sequence and a
+      full text instruction; charts have text summaries and tables (stages 8 and 12)
+- [x] Inline links are underlined, not distinguished by colour alone (F7)
+
+### Acceptance, as the prompt states it
+
+- [x] **`docs/THREAT_MODEL.md` and `docs/SAFETY_MATRIX.md` exist**
+- [x] **Automated authorisation and accessibility checks** — `src/persistence/rls.test.ts`,
+      the repository contract run under RLS, `e2e/accessibility.spec.ts`, `e2e/trust.spec.ts`
+- [x] **Core flows tested with keyboard and reduced motion** — scripted in a real browser on
+      both phone and desktop projects
+- [x] **All high-severity findings fixed or explicitly blocking release** — F1, F2 and F4 fixed;
+      clinical and dietitian review explicitly block release (THREAT_MODEL §5)
+
+### Verification
+
+- [x] `npm test` — **1213** unit, component and database tests
+- [x] `npm run e2e` — **274** end-to-end tests (28 skipped by design), run twice against a
+      freshly started server
+- [x] Format, lint, typecheck and build all clean
+- [x] Screenshots inspected at 390×844 and 1440×900 — safety and modules, privacy, Today
+
+### Not done, and why
+
+- [ ] **A person using VoiceOver or TalkBack** — automated and keyboard checks pass; a human
+      screen-reader session is still needed before broader testing
+- [ ] **Clinical and dietitian review** — blocks release, not the build
+- [ ] **`prune_audit_events()` scheduled** — needs the Supabase project
+
+## Stages 14–17 — not started
+
+Tracked in `docs/PROJECT_LEDGER.md` §8. No item below stage 14 may be ticked before the
 stage that builds it has run and been verified.

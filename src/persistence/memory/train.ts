@@ -179,6 +179,12 @@ export function createMemoryTrain(
       };
     },
 
+    forgetWorkouts(userId: string) {
+      workouts.delete(userId);
+      for (const tokenKey of [...tokens.keys()])
+        if (tokenKey.startsWith(`${userId}::`)) tokens.delete(tokenKey);
+    },
+
     deleteTrain(userId: string) {
       setups.delete(userId);
       workouts.delete(userId);

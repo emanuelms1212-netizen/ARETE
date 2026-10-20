@@ -12,6 +12,7 @@ import {
   TimerRing,
   useReducedMotion,
   useToast,
+  StopGuidance,
 } from '@/components/ui';
 import {
   BREATHWORK_SAFETY,
@@ -421,6 +422,9 @@ export function SessionPlayer({
         <p className="mt-3 text-body-sm text-ink-muted">
           {formatDuration(view.elapsedSeconds)} so far
         </p>
+        <div className="mt-3 text-left">
+          <StopGuidance module={kind === 'breathwork' ? 'breathwork' : 'meditation'} />
+        </div>
       </div>
     </Card>
   );

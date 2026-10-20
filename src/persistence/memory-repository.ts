@@ -1,8 +1,10 @@
 import {
+  AUDIT_DETAIL_PATTERN,
   ONBOARDING_STEPS,
   onboardingProfileSchema,
   parseStepAnswers,
   type AnswerableStep,
+  type AuditEvent,
   type Commitment,
   type Day,
   type DayMark,
@@ -23,6 +25,7 @@ import { demoNutrition } from './demo-nutrition';
 import { createMemoryTrain } from './memory/train';
 import { demoTraining } from './demo-training';
 import {
+  InvalidWriteError,
   RecordNotFoundError,
   type AccountExport,
   type AreteRepository,
@@ -42,6 +45,7 @@ interface MemoryState {
   focus: Map<string, FocusSession>;
   onboarding: Map<string, OnboardingRecord>;
   drafts: Map<string, { id: string; userId: string; draft: DraftWeek; acceptedAt: string | null }>;
+  audit: Map<string, AuditEvent[]>;
 }
 
 function key(userId: string, localDate: IsoDate): string {
@@ -74,6 +78,7 @@ export function createMemoryRepository(
     focus: new Map(),
     onboarding: new Map(),
     drafts: new Map(),
+    audit: new Map(),
   };
 
   for (const day of seed) {
@@ -97,7 +102,7 @@ export function createMemoryRepository(
 
   // Goals, tasks, habits, the day's framing and the live timer. Kept in their
   // own module because the day loop added five entities at once.
-  const daily = createMemoryDailySystem({
+  const { admin: dailyAdmin, ...daily } = createMemoryDailySystem({
     onFocusFinished: (userId, session) => {
       state.focus.set(`${userId}::timer::${session.id}`, session);
     },
@@ -112,11 +117,11 @@ export function createMemoryRepository(
   if (planSeed !== null) daily.seed(seedUserId, planSeed);
 
   // Meditation, breathwork and cognitive practice.
-  const mind = createMemoryMind();
+  const { admin: mindAdmin, ...mind } = createMemoryMind();
 
   // Training. Saving a Train setup also updates onboarding's training answers,
   // as the SQL adapter does by writing both to one row.
-  const { seedTrain, exportTrain, deleteTrain, ...train } = createMemoryTrain({
+  const { seedTrain, exportTrain, deleteTrain, forgetWorkouts, ...train } = createMemoryTrain({
     onSetupSaved: (userId, setup) => {
       const record = onboardingFor(userId);
       const previous = (record.answers['training'] ?? {}) as Record<string, unknown>;
@@ -138,7 +143,14 @@ export function createMemoryRepository(
 
   // Nutrition. Onboarding's food answers (numbers hidden, units) and birth year
   // are the starting point for settings, and saving settings keeps them in step.
-  const { seedNutrition, exportNutrition, deleteNutrition, ...nutrition } = createMemoryNutrition({
+  const {
+    seedNutrition,
+    exportNutrition,
+    deleteNutrition,
+    forgetFood,
+    forgetWeights,
+    ...nutrition
+  } = createMemoryNutrition({
     defaults: (userId) => {
       const answers = onboardingFor(userId).answers as Record<
         string,
@@ -171,12 +183,19 @@ export function createMemoryRepository(
   });
   if (planSeed !== null) seedNutrition(seedUserId, demoNutrition());
 
-  const { exportNotifications, deleteNotifications, ...notifications } =
+  const { exportNotifications, deleteNotifications, forgetEvents, ...notifications } =
     createMemoryNotifications();
 
   // The reset, the journal's weekly review and contrast therapy. The journal's
   // daily pages are the framing and review the day system already holds.
-  const { exportPrograms, deletePrograms, ...programs } = createMemoryPrograms({
+  const {
+    exportPrograms,
+    deletePrograms,
+    forgetProgrammes,
+    forgetWeekly,
+    forgetScreening,
+    ...programs
+  } = createMemoryPrograms({
     readDay: async (userId, localDate) => ({
       framing: await daily.getFraming(userId, localDate),
       review: await daily.getDayReview(userId, localDate),
@@ -449,11 +468,76 @@ export function createMemoryRepository(
       for (const mapKey of [...state.focus.keys()]) {
         if (mapKey.startsWith(`${userId}::`)) state.focus.delete(mapKey);
       }
+      // Everything, as the SQL cascade does: goals, habits, the journal's
+      // pages, mind practice, onboarding and drafts included.
+      dailyAdmin.forgetEverything(userId);
+      mindAdmin.forgetEverything(userId);
+      state.onboarding.delete(userId);
+      for (const [id, draft] of [...state.drafts.entries()])
+        if (draft.userId === userId) state.drafts.delete(id);
+      state.audit.delete(userId);
       deleteTrain(userId);
       deleteFlexibility(userId);
       deleteNutrition(userId);
       deletePrograms(userId);
       deleteNotifications(userId);
+    },
+
+    async deleteFeatureData(userId, feature) {
+      switch (feature) {
+        case 'journal':
+          dailyAdmin.forgetJournal(userId);
+          forgetWeekly(userId);
+          return;
+        case 'food':
+          forgetFood(userId);
+          return;
+        case 'body':
+          forgetWeights(userId);
+          return;
+        case 'training':
+          forgetWorkouts(userId);
+          return;
+        case 'flexibility':
+          deleteFlexibility(userId);
+          return;
+        case 'mind':
+          mindAdmin.forgetSessions(userId);
+          return;
+        case 'focus':
+          dailyAdmin.forgetFocus(userId);
+          for (const mapKey of [...state.focus.keys()])
+            if (mapKey.startsWith(`${userId}::`)) state.focus.delete(mapKey);
+          return;
+        case 'programmes':
+          forgetProgrammes(userId);
+          return;
+        case 'health': {
+          const record = state.onboarding.get(userId);
+          if (record) {
+            const rest = { ...(record.answers as Record<string, unknown>) };
+            delete rest['health'];
+            record.answers = rest;
+          }
+          forgetScreening(userId);
+          return;
+        }
+        case 'notifications':
+          forgetEvents(userId);
+          return;
+      }
+    },
+
+    async recordAudit(userId, event) {
+      if (event.detail !== null && !AUDIT_DETAIL_PATTERN.test(event.detail))
+        throw new InvalidWriteError('Audit details are short machine words, never free text.');
+      const list = state.audit.get(userId) ?? [];
+      list.push({ action: event.action, detail: event.detail, at: new Date().toISOString() });
+      state.audit.set(userId, list);
+    },
+
+    async listAuditEvents(userId, limit) {
+      return [...(state.audit.get(userId) ?? [])].reverse().slice(0, Math.max(0, limit));
     },
   };
 }

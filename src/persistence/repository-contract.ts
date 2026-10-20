@@ -2905,5 +2905,167 @@ export function describeRepositoryContract(
         [],
       );
     });
+
+    it('leaves nothing behind in the export after deleting everything', async () => {
+      const { repository, userId } = await fresh();
+      await repository.setFraming(userId, { localDate: DAY, timeZone: ZONE, intention: 'Write' });
+      await repository.saveDayReview(userId, {
+        localDate: DAY,
+        timeZone: ZONE,
+        wentWell: 'Started early.',
+        friction: null,
+        tomorrowOneThing: null,
+        energy: null,
+        metMinimum: false,
+      });
+      await repository.recordAudit(userId, { action: 'export', detail: null });
+
+      await repository.deleteEverything(userId);
+
+      const after = await repository.exportEverything(userId);
+      const leftovers = Object.entries(after.tables)
+        .filter(([, rows]) => Array.isArray(rows) && rows.length > 0)
+        .map(([table]) => table)
+        // The account row and its defaults are recreated on first read in SQL.
+        .filter((table) => !['preferences', 'onboarding_progress'].includes(table));
+      expect(leftovers).toEqual([]);
+    });
+
+    describe('deleting one part of the account', () => {
+      async function stocked() {
+        const subject = await fresh();
+        const { repository, userId } = subject;
+        await repository.setFraming(userId, {
+          localDate: DAY,
+          timeZone: ZONE,
+          intention: 'Finish the draft',
+          inMyControl: 'My hours',
+        });
+        await repository.saveDayReview(userId, {
+          localDate: DAY,
+          timeZone: ZONE,
+          wentWell: 'Started early.',
+          friction: 'Too many tabs.',
+          tomorrowOneThing: null,
+          energy: 'steady',
+          metMinimum: true,
+        });
+        await repository.saveWeeklyReview(userId, {
+          weekStart: DAY,
+          timeZone: ZONE,
+          answers: { moved: 'Mornings.' },
+        });
+        const food = await repository.saveFood(userId, {
+          food: {
+            name: 'Oats',
+            servingLabel: '40 g',
+            servingGrams: 40,
+            nutrients: { kcal: 150, proteinG: 5, carbsG: 27, fatG: 3, fiberG: 4 },
+            source: 'label',
+          },
+        });
+        await repository.addFoodEntry(userId, {
+          localDate: DAY,
+          timeZone: ZONE,
+          slot: 'breakfast',
+          foodId: food.id,
+          servings: 1,
+          clientToken: 'privacy-food',
+        });
+        await repository.logWeight(userId, {
+          localDate: DAY,
+          timeZone: ZONE,
+          weightKg: 80,
+          at: new Date('2026-03-16T07:00:00Z'),
+        });
+        await repository.recordFocusSession(userId, {
+          localDate: DAY,
+          timeZone: ZONE,
+          plannedMinutes: 25,
+          startedAt: new Date('2026-03-16T09:00:00.000Z'),
+          endedAt: new Date('2026-03-16T09:25:00.000Z'),
+          actualSeconds: 1500,
+          status: 'completed',
+          clientToken: 'privacy-focus',
+        });
+        await repository.recordNotificationEvent(userId, {
+          localDate: DAY,
+          timeZone: ZONE,
+          key: 'evening',
+          kind: 'evening_review',
+          action: 'dismissed',
+          snoozedUntil: null,
+        });
+        await repository.saveStep(userId, 'health', {
+          pregnancyStatus: 'not_applicable',
+          heatSensitivity: true,
+        });
+        return subject;
+      }
+
+      const range = { from: DAY, to: DAY };
+
+      it('removes the journal and keeps the day', async () => {
+        const { repository, userId } = await stocked();
+        await repository.deleteFeatureData(userId, 'journal');
+        const framing = await repository.getFraming(userId, DAY);
+        expect(framing.intention ?? null).toBeNull();
+        expect(framing.inMyControl ?? null).toBeNull();
+        expect(await repository.getDayReview(userId, DAY)).toBeNull();
+        expect(await repository.getWeeklyReview(userId, DAY)).toEqual({});
+        expect(await repository.listFoodEntries(userId, range)).toHaveLength(1);
+      });
+
+      it('removes the food log and keeps the weigh-ins', async () => {
+        const { repository, userId } = await stocked();
+        await repository.deleteFeatureData(userId, 'food');
+        expect(await repository.listFoodEntries(userId, range)).toEqual([]);
+        expect(await repository.listFoods(userId)).toEqual([]);
+        expect(await repository.listWeights(userId, range)).toHaveLength(1);
+      });
+
+      it('removes weigh-ins and keeps the food log', async () => {
+        const { repository, userId } = await stocked();
+        await repository.deleteFeatureData(userId, 'body');
+        expect(await repository.listWeights(userId, range)).toEqual([]);
+        expect(await repository.listFoodEntries(userId, range)).toHaveLength(1);
+      });
+
+      it('removes focus sessions and reminder history', async () => {
+        const { repository, userId } = await stocked();
+        await repository.deleteFeatureData(userId, 'focus');
+        await repository.deleteFeatureData(userId, 'notifications');
+        expect(await repository.listFocusSessions(userId, DAY)).toEqual([]);
+        expect(await repository.listNotificationEvents(userId, range)).toEqual([]);
+        expect(await repository.getDayReview(userId, DAY)).not.toBeNull();
+      });
+
+      it('removes health answers, so nothing is assumed in their place', async () => {
+        const { repository, userId } = await stocked();
+        expect((await repository.getOnboarding(userId)).profile.health.heatSensitivity).toBe(true);
+        await repository.deleteFeatureData(userId, 'health');
+        expect((await repository.getOnboarding(userId)).profile.health.heatSensitivity).toBe(false);
+        expect(await repository.getContrastScreening(userId)).toBeNull();
+      });
+    });
+
+    describe('the audit trail', () => {
+      it('records what happened, newest first, and never free text', async () => {
+        const { repository, userId } = await fresh();
+        await repository.recordAudit(userId, { action: 'export', detail: null });
+        await repository.recordAudit(userId, { action: 'delete_feature', detail: 'food' });
+        const events = await repository.listAuditEvents(userId, 10);
+        expect(events.map((event) => [event.action, event.detail])).toEqual([
+          ['delete_feature', 'food'],
+          ['export', null],
+        ]);
+        await expect(
+          repository.recordAudit(userId, {
+            action: 'delete_feature',
+            detail: 'I felt awful today',
+          }),
+        ).rejects.toThrow(/machine words/);
+      });
+    });
   });
 }

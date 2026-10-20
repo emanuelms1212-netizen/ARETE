@@ -1,6 +1,5 @@
 import {
   addDays,
-  contrastEligibility,
   screeningHints,
   type ContrastEligibility,
   type ContrastQuestionId,
@@ -9,7 +8,7 @@ import {
   type IsoDate,
 } from '@/domain';
 import type { AreteRepository } from '@/persistence/repository';
-import { contrastReady, personInputs } from '../reset/context';
+import { loadEligibility } from '../../eligibility';
 
 export interface ContrastContext {
   readonly today: IsoDate;
@@ -17,6 +16,8 @@ export interface ContrastContext {
   readonly acknowledged: string | null;
   readonly eligibility: ContrastEligibility;
   readonly minor: boolean;
+  /** False when age or an onboarding answer rules contrast out entirely. */
+  readonly offered: boolean;
   readonly hints: Partial<Record<ContrastQuestionId, boolean>>;
   readonly sessions: readonly ContrastSessionRecord[];
 }
@@ -26,22 +27,20 @@ export async function loadContrastContext(
   userId: string,
   today: IsoDate,
 ): Promise<ContrastContext> {
-  const [{ minor }, ready, onboarding, sessions] = await Promise.all([
-    personInputs(repository, userId, today),
-    contrastReady(repository, userId),
+  const [decided, screening, acknowledged, onboarding, sessions] = await Promise.all([
+    loadEligibility(repository, userId, today),
+    repository.getContrastScreening(userId),
+    repository.getSafetyAcknowledgement(userId, 'contrast_therapy'),
     repository.getOnboarding(userId),
     repository.listContrastSessions(userId, { from: addDays(today, -60), to: today }),
   ]);
   return {
     today,
-    screening: ready.screening,
-    acknowledged: ready.acknowledged,
-    eligibility: contrastEligibility({
-      screening: ready.screening,
-      isMinor: minor,
-      acknowledgedVersion: ready.acknowledged,
-    }),
-    minor,
+    screening,
+    acknowledged,
+    eligibility: decided.contrast,
+    minor: decided.minor,
+    offered: decided.contrastOffered,
     hints: screeningHints(onboarding.profile.health),
     sessions,
   };

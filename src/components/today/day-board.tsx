@@ -170,7 +170,8 @@ export function DayBoard({
 
               return (
                 <li key={commitment.id} className="py-3">
-                  <div className="flex items-start gap-3">
+                  {/* Wraps rather than overflowing when text is enlarged. */}
+                  <div className="flex flex-wrap items-start gap-3">
                     <button
                       type="button"
                       aria-pressed={isDone}
@@ -229,7 +230,7 @@ export function DayBoard({
                       </p>
                     </div>
 
-                    <div className="flex shrink-0 items-center gap-1">
+                    <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-1">
                       {/* Reorder by one place, with buttons rather than drag:
                           a drag handle is unreachable by keyboard and fiddly
                           with a thumb, which is how this screen is used. */}

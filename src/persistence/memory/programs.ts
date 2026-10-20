@@ -403,6 +403,25 @@ export function createMemoryPrograms(hooks: {
       };
     },
 
+    forgetProgrammes(userId: string) {
+      const mine = users.get(userId);
+      if (!mine) return;
+      mine.enrolments = [];
+      mine.logs = [];
+      mine.checkins = [];
+      mine.contrast = [];
+      mine.contrastTokens.clear();
+    },
+
+    forgetWeekly(userId: string) {
+      users.get(userId)?.weekly.clear();
+    },
+
+    forgetScreening(userId: string) {
+      const mine = users.get(userId);
+      if (mine) mine.screening = null;
+    },
+
     deletePrograms(userId: string) {
       users.delete(userId);
     },

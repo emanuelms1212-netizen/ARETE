@@ -9,7 +9,6 @@ export const metadata: Metadata = { title: 'Settings' };
 
 const plannedSections: readonly { name: string; stage: string }[] = [
   { name: 'Profile and preferences', stage: 'stage 5' },
-  { name: 'Modules, including opt-in safety modules', stage: 'stage 13' },
 ];
 
 export default function SettingsPage() {
@@ -47,6 +46,24 @@ export default function SettingsPage() {
       <Section title="Your data" hint="Download everything, or delete your account.">
         <Link href="/settings/data" className="text-body text-accent hover:underline">
           Export or delete
+        </Link>
+      </Section>
+
+      <Section
+        title="Privacy"
+        hint="Where your data goes, how long it stays, and deleting one part."
+      >
+        <Link href="/settings/privacy" className="text-body text-accent hover:underline">
+          Privacy settings
+        </Link>
+      </Section>
+
+      <Section
+        title="Safety and modules"
+        hint="What each module offers you, and the answers behind it."
+      >
+        <Link href="/settings/safety" className="text-body text-accent hover:underline">
+          Safety and modules
         </Link>
       </Section>
 

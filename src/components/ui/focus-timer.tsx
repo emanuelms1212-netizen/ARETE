@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PauseIcon, PlayIcon } from '@/components/icons';
+import { timerAnnouncement } from '@/domain';
 import { Button } from './button';
 import { TimerRing } from './timer-ring';
 
@@ -99,7 +100,7 @@ export function FocusTimer({ totalSeconds = 25 * 60 }: FocusTimerProps) {
       </div>
 
       <p role="status" className="sr-only">
-        {running ? `Focusing, ${format(remaining)} remaining` : 'Timer paused'}
+        {running ? `Focusing. ${timerAnnouncement(remaining)}` : 'Timer paused'}
       </p>
     </div>
   );

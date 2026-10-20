@@ -3,8 +3,8 @@
 The running record of what ARETE is, what has been decided, and what happens next.
 Updated at the end of every stage.
 
-**Last updated:** 2026-10-19
-**Stage:** 12 of 17 — Progress, the weekly review and quiet notifications
+**Last updated:** 2026-10-20
+**Stage:** 13 of 17 — Safety, privacy, accessibility and trust
 **Branch:** `build/prompt-pack-v1`
 **Repository:** `emanuelms1212-netizen/ARETE`
 
@@ -29,7 +29,7 @@ at the end of every stage.
 | Styling                           | Tailwind CSS v4 over design tokens                                             | 4.3.3                  |
 | Faces                             | Fraunces Variable (display), Inter Variable (UI), self-hosted                  | 5.3.0                  |
 | Validation                        | Zod                                                                            | 4.5.4                  |
-| Database                          | Postgres. Schema in `supabase/migrations`, 51 tables, RLS on all of them       | —                      |
+| Database                          | Postgres. Schema in `supabase/migrations`, 61 tables, RLS on all of them       | —                      |
 | Driver                            | `pg`, pooled, request-scoped JWT claim per transaction                         | 8.17.0                 |
 | Auth                              | Supabase Auth, **authentication only**                                         | `@supabase/ssr` 0.12.7 |
 | Test database                     | PGlite — Postgres 18 in-process, no server, no credentials                     | 0.5.8                  |
@@ -178,11 +178,22 @@ suite — and the SQL one passes it _through_ row-level security, as the `authen
 | **D115** | **The next week is proposed, never written, until the person ticks and confirms**                              | Built from open tasks (soonest due first, two a day), habits, the training plan, flexibility days and recovery after back-to-back training; five things a day at most; tasks with no room are named. The server recomputes the proposal on confirm and adds only items it proposed                                                                                                                                                                                      | Yes         |
 | **D116** | **Exports are the signed-in person's own data, for a range or in full; deletion needs a typed phrase**         | `/api/export` takes the user from the session, never the request; a range keeps only rows dated inside it. Delete everything is immediate and asks for "delete everything" typed                                                                                                                                                                                                                                                                                        | Yes         |
 | **D117** | **Finished focus timers count the same in both adapters**                                                      | The memory adapter now records a finished timer where the SQL table already did, so Progress reads the same focus minutes in demo and live mode                                                                                                                                                                                                                                                                                                                         | No          |
+| **D118** | **One place decides eligibility; the strictest source wins**                                                   | `domain/eligibility.ts` composes the safety rules, contrast screening, cold acknowledgement, nutrition safeguards and the merged injury flags, and every server context loads it through `app/(app)/eligibility.ts`. Contrast and the Reset's cold finish now honour onboarding answers that rule heat and cold out — before, a clean screening plus a clearance tick could override them (THREAT_MODEL F1, F2)                                                         | No          |
+| **D119** | **Per-feature deletion, ten parts, each saying what goes and what stays**                                      | Journal, food, body, training, flexibility, mind, focus, programmes, health, reminder history. Settings stay unless they are the data. `delete_my_feature()` is security invoker, so RLS still applies                                                                                                                                                                                                                                                                  | Yes         |
+| **D120** | **An audit trail of sensitive actions that records what and when, never content**                              | Export, per-feature deletion, health-answer changes, contrast screening, safety acknowledgements. `detail` is a machine word enforced by the database; append-only for the person; 400-day retention                                                                                                                                                                                                                                                                    | Yes         |
+| **D121** | **Analytics can never name food, weight, injury, health, the journal or the practice reminder**                | Module and reminder kinds became enums that exclude them; `food_entry_created` was removed. Unknown fields are stripped before the sink                                                                                                                                                                                                                                                                                                                                 | Yes         |
+| **D122** | **Per-person rate limits on export and deletion, in memory**                                                   | A speed bump for scripts and stuck clients (20 exports or part-deletions per 10 minutes, 5 account deletions an hour). Per instance; a shared store is the upgrade before scale                                                                                                                                                                                                                                                                                         | Yes         |
+| **D123** | **Timers announce every five minutes, the last minute and the end**                                            | A live region holding the clock was read out every second. The clock itself is `role="timer"` (not live)                                                                                                                                                                                                                                                                                                                                                                | Yes         |
+| **D124** | **A content security policy on every response**                                                                | Same-origin everything plus the Supabase origin; `frame-ancestors 'none'`. `unsafe-inline` scripts remain until nonces                                                                                                                                                                                                                                                                                                                                                  | Yes         |
+| **D125** | **Stop guidance written once, shown where effort is asked for**                                                | `domain/stop-guidance.ts` + `StopGuidance`: workout, flexibility, breathwork, meditation, journal, food, contrast, cold. Acknowledgement ticks only for cold and contrast, to avoid disclaimer fatigue                                                                                                                                                                                                                                                                  | Yes         |
+| **D126** | **A claims scan in the test suite**                                                                            | Every source string is checked for cure, diagnosis, guarantees, IQ, supplements, detox, "proven" and causal wording, allowing negated sentences                                                                                                                                                                                                                                                                                                                         | Yes         |
 
 ## 3. Data model
 
-60 tables. The full account is in **`docs/DATA_MODEL.md`**; the schema itself is
-`supabase/migrations/0001` through `0019`. Stage 12 added `notification_events` (what was
+61 tables. The full account is in **`docs/DATA_MODEL.md`**; the schema itself is
+`supabase/migrations/0001` through `0020`. Stage 13 added `audit_events` (what sensitive
+action happened and when, never its content), `delete_my_feature()` and
+`prune_audit_events()`. Stage 12 added `notification_events` (what was
 done, snoozed or dismissed) and the settings quiet notifications need on
 `notification_preferences` (module switches, a daily cap, bundling, the practice reminder).
 Stage 11 added the reset (`reset_enrolments`,
@@ -210,7 +221,7 @@ Five conventions run through all of it: ownership by `user_id` with RLS; local d
 zone stored beside the date; template / instance / log as separate tables; one unit system in
 storage; and `client_token` on every write a retry might repeat.
 
-**Migrations:** 19, applying from zero, proven in `src/persistence/rls.test.ts`.
+**Migrations:** 20, applying from zero, proven in `src/persistence/rls.test.ts`.
 **Applied once, and proven:** `public.schema_migrations` records every applied file with a
 checksum (D39). A test asserts that a second `db:migrate` applies nothing, and that an
 already-applied file which has since been edited fails loudly rather than diverging quietly.
@@ -236,8 +247,10 @@ already-applied file which has since been edited fails loudly rather than diverg
 | `/progress`               | **dynamic**   | Live — 7/28/90-day ranges, a narrative, per-module charts with text and tables, streaks beside consistency, observations, export                                                                 |
 | `/settings/notifications` | **dynamic**   | Live — module switches, times, quiet hours, daily cap, bundling, practice reminder, today's plan with reasons                                                                                    |
 | `/settings/data`          | **dynamic**   | Live — export everything; delete everything behind a typed phrase                                                                                                                                |
+| `/settings/privacy`       | **dynamic**   | Live — where data goes, retention, delete one part of the account, recent sensitive actions                                                                                                      |
+| `/settings/safety`        | **dynamic**   | Live — what each gated module offers this person and why, a link to change health answers, stop guidance                                                                                         |
 | `/api/export`             | route handler | The signed-in person's data as JSON, in full or for a date range                                                                                                                                 |
-| `/settings`               | static        | Build info, and links to notifications, data and programmes                                                                                                                                      |
+| `/settings`               | static        | Build info, and links to notifications, data, privacy, safety and programmes                                                                                                                     |
 | `/styleguide`             | dev only      | 404s in production                                                                                                                                                                               |
 | `/api/health`             | route handler | Build, version and mode. No secrets                                                                                                                                                              |
 
@@ -246,9 +259,9 @@ already-applied file which has since been edited fails loudly rather than diverg
 | Gate                         | Command                                                   | In CI           |
 | ---------------------------- | --------------------------------------------------------- | --------------- |
 | Format · Lint · Types        | `format:check` · `lint` · `typecheck`                     | Yes             |
-| Unit, component and database | `npm test` — **1176 tests**                               | Yes             |
+| Unit, component and database | `npm test` — **1213 tests**                               | Yes             |
 | Build                        | `npm run build`                                           | Yes             |
-| End-to-end                   | `npm run e2e` — **204 tests** (27 skipped by design, D76) | Yes             |
+| End-to-end                   | `npm run e2e` — **274 tests** (28 skipped by design, D76) | Yes             |
 | Everything                   | `npm run verify`                                          | —               |
 | Migrate / seed / reset       | `db:migrate` · `db:seed` · `db:reset`                     | No — deployment |
 
@@ -320,7 +333,9 @@ already-applied file which has since been edited fails loudly rather than diverg
 | Exercise animations were drawn by an engineer              | Medium   | A coach or physiotherapist     | Nine original keyframe animations, held to kinematic and form checks in tests. They are labelled instructional aids, not form assessment; a qualified reviewer should still look at each before launch                                                                     |
 | No infrastructure                                          | Medium   | Engineering                    | §8                                                                                                                                                                                                                                                                         |
 | **The safety rules have not been reviewed by a clinician** | **High** | Product + a qualified reviewer | The rules in `src/domain/safety.ts` are conservative and tested, but they were written by an engineer reading source PDFs. Pregnancy, cardiovascular and injury gating is exactly the kind of judgement that needs a professional to sign it off before real users meet it |
-| Screen-reader testing has not been done                    | Medium   | Engineering                    | Stage 13                                                                                                                                                                                                                                                                   |
+| A person has not yet used it with VoiceOver or TalkBack    | Medium   | Engineering                    | Stage 13 added axe on every route, keyboard, focus-trap, reduced-motion, 200% text and target-size checks. A human screen-reader pass is still needed before broader testing                                                                                               |
+| Rate limits are per server instance                        | Medium   | Engineering                    | D122. Move to a shared store before more than one instance serves real accounts                                                                                                                                                                                            |
+| The public demo shares one account anyone can clear        | Low      | Engineering                    | Demo data only, in memory, reset on restart                                                                                                                                                                                                                                |
 | No backup or restore procedure                             | Medium   | Engineering                    | Needed before any real user data exists                                                                                                                                                                                                                                    |
 | Unattributed quotes in a source PDF                        | Low      | Content                        | The schema now refuses to attribute anything unverified                                                                                                                                                                                                                    |
 
@@ -339,7 +354,7 @@ already-applied file which has since been edited fails loudly rather than diverg
      that row-level security applies to. Environment validation rejects a service-role URL here.
    - the **service-role** URL, as `SUPABASE_DB_URL`, kept out of the repository. Migrations
      and the seed only.
-4. `npm run db:reset` — applies all nineteen migrations, then seeds content and the demo account.
+4. `npm run db:reset` — applies all twenty migrations, then seeds content and the demo account.
 5. In **Authentication → Providers**, enable email, and one social provider.
 6. Set `NEXT_PUBLIC_APP_MODE=live` and start the app.
 
@@ -352,10 +367,13 @@ The safety rules need a clinical reviewer before real users meet them (§7). The
 written, conservative and tested; what is missing is a professional saying so. This is not
 blocking stage 6, but it blocks launch.
 
-### Then: stage 13
+Once it exists, schedule `prune_audit_events()` daily (pg_cron) so the audit trail keeps
+its 400-day promise.
 
-Prompt 13 in the pack: the safety, privacy, accessibility and trust pass — hardening every
-module before broader testing. Stage 12 is done: see `docs/ACCEPTANCE.md`.
+### Then: stage 14
+
+Prompt 14 in the pack. Stage 13 is done: see `docs/ACCEPTANCE.md`, `docs/THREAT_MODEL.md` and
+`docs/SAFETY_MATRIX.md`. **Release stays blocked** on the clinical and dietitian reviews (§7).
 
 Still open from earlier stages, in the order they will bite: the Supabase project (above), the
 four unimplemented cognitive drills (D61), tasks having no edit screen, habit schedules not yet

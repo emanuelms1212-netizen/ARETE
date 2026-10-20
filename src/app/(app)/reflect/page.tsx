@@ -119,7 +119,7 @@ export default async function ReflectPage({
         {data.journal.length === 0 ? (
           <p className="text-body-sm text-ink-muted">
             Nothing written this week.{' '}
-            <Link href="/today" className="text-accent hover:underline">
+            <Link href="/today" className="text-accent underline underline-offset-2">
               Today
             </Link>{' '}
             has the morning and evening questions.
@@ -164,7 +164,7 @@ export default async function ReflectPage({
             {quote.author}, {quote.work}, translated by {quote.translator}.{' '}
             <a
               href={quote.sourceUrl}
-              className="text-accent hover:underline"
+              className="text-accent underline underline-offset-2"
               rel="noreferrer"
               target="_blank"
             >

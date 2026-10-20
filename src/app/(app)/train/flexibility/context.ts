@@ -1,7 +1,7 @@
 import { FLEX_MOVEMENTS } from '@/content/flexibility/hamstring';
 import {
   checkinDue,
-  flexEligibility,
+  flexEligibilityFor,
   programState,
   type FlexEligibility,
   type FlexEnrolment,
@@ -12,6 +12,7 @@ import {
   type StoredCheckin,
 } from '@/domain';
 import { isDemoMode } from '@/lib/env';
+import { loadEligibility } from '../../eligibility';
 import type { AreteRepository } from '@/persistence/repository';
 
 /**
@@ -46,14 +47,12 @@ export async function loadFlexContext(
   const listing = listings[0] ?? null;
   const program = listing?.program ?? null;
 
-  const [onboarding, setup, running] = await Promise.all([
-    repository.getOnboarding(userId),
-    repository.getTrainingSetup(userId),
+  const [decided, running] = await Promise.all([
+    loadEligibility(repository, userId, localDate),
     repository.getRunningFlexSession(userId),
   ]);
-  const flags = [...onboarding.profile.health.injuries, ...(setup?.painFlags ?? [])];
   const eligibility = program
-    ? flexEligibility(program, flags, FLEX_MOVEMENTS)
+    ? flexEligibilityFor(decided, program, FLEX_MOVEMENTS)
     : ({ kind: 'ok' } as const);
 
   const enrolment = program ? await repository.getActiveEnrolment(userId, program.slug) : null;

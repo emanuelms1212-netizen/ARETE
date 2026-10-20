@@ -233,7 +233,7 @@ export default async function TodayPage() {
 
       <p className="text-body-sm text-ink-muted">
         The morning and evening questions are your journal.{' '}
-        <Link href="/reflect" className="text-accent hover:underline">
+        <Link href="/reflect" className="text-accent underline underline-offset-2">
           See the week and write the weekly review
         </Link>
         .

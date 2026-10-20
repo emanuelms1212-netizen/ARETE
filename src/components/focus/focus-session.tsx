@@ -17,6 +17,7 @@ import {
   describeLink,
   formatDuration,
   presetBySlug,
+  timerAnnouncement,
   timerView,
   type FocusSession as Session,
 } from '@/domain';
@@ -227,9 +228,8 @@ export function FocusSessionPanel({
 
         {/* The announcement, not a sound. */}
         <p role="status" aria-live="polite" className="sr-only">
-          {view.isOvertime
-            ? `Focus session complete. ${formatDuration(view.overtimeSeconds)} over.`
-            : `${formatDuration(view.remainingSeconds)} remaining.`}
+          {/* Coarse on purpose: the clock itself is never in a live region. */}
+          {view.isOvertime ? 'Focus session complete.' : timerAnnouncement(view.remainingSeconds)}
         </p>
 
         {view.isOvertime ? (

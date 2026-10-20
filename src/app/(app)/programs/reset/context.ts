@@ -1,14 +1,12 @@
 import {
-  COLD_NOTICE_VERSION,
-  CONTRAST_NOTICE_VERSION,
   addDays,
-  isMinor,
   programLength,
   resetCustomisationSchema,
   resetDayState,
   resetSummary,
   resetTargets,
-  type ContrastScreening,
+  type ColdEligibility,
+  type Eligibility,
   type IsoDate,
   type ResetCheckin,
   type ResetCustomisation,
@@ -19,6 +17,7 @@ import {
   type ResetTarget,
 } from '@/domain';
 import type { AreteRepository, ResetEnrolment } from '@/persistence/repository';
+import { loadEligibility } from '../../eligibility';
 
 /**
  * Everything the Reset screen and its actions need, from one place.
@@ -47,6 +46,8 @@ export interface ResetContext {
   readonly summary: ResetSummary | null;
   readonly lastSummary: ResetSummary | null;
   readonly contrastAvailable: boolean;
+  /** From the central rules: whether the cold finish can be offered at all. */
+  readonly cold: ColdEligibility;
   readonly coldAcknowledged: boolean;
 }
 
@@ -54,14 +55,19 @@ export async function personInputs(
   repository: AreteRepository,
   userId: string,
   today: IsoDate,
-): Promise<{ person: ResetPersonInputs; defaults: ResetCustomisation; minor: boolean }> {
-  const [onboarding, setup, weights] = await Promise.all([
+): Promise<{
+  person: ResetPersonInputs;
+  defaults: ResetCustomisation;
+  minor: boolean;
+  decided: Eligibility;
+}> {
+  const [onboarding, setup, weights, decided] = await Promise.all([
     repository.getOnboarding(userId),
     repository.getTrainingSetup(userId),
     repository.listWeights(userId, { from: addDays(today, -365), to: today }),
+    loadEligibility(repository, userId, today),
   ]);
   const profile = onboarding.profile;
-  const flags = [...profile.health.injuries, ...(setup?.painFlags ?? [])];
   return {
     person: {
       weightKg: weights.at(-1)?.weightKg ?? null,
@@ -70,25 +76,15 @@ export async function personInputs(
       sessionMinutes: setup?.sessionMinutes ?? profile.training.sessionMinutes,
       mindExperience: profile.mind.meditationExperience,
       busyWeekdays: profile.schedule.weekdayConstraint !== 'none',
-      recoveryFlag: flags.some((flag) => flag.severity !== 'mild'),
+      recoveryFlag: decided.recoveryFlag,
     },
     defaults: resetCustomisationSchema.parse({
       wakeTime: profile.schedule.wakeTime ?? null,
       bedTime: profile.schedule.sleepTime ?? null,
     }),
-    minor: isMinor(profile.age.birthYear, today),
+    minor: decided.minor,
+    decided,
   };
-}
-
-export async function contrastReady(
-  repository: AreteRepository,
-  userId: string,
-): Promise<{ screening: ContrastScreening | null; acknowledged: string | null }> {
-  const [screening, acknowledged] = await Promise.all([
-    repository.getContrastScreening(userId),
-    repository.getSafetyAcknowledgement(userId, 'contrast_therapy'),
-  ]);
-  return { screening, acknowledged };
 }
 
 export async function loadResetContext(
@@ -96,16 +92,15 @@ export async function loadResetContext(
   userId: string,
   today: IsoDate,
 ): Promise<ResetContext> {
-  const [{ person, defaults }, enrolment, last, framing, contrast, coldAck] = await Promise.all([
+  const [{ person, defaults, decided }, enrolment, last, framing] = await Promise.all([
     personInputs(repository, userId, today),
     repository.getActiveReset(userId),
     repository.getLastReset(userId),
     repository.getFraming(userId, today),
-    contrastReady(repository, userId),
-    repository.getSafetyAcknowledgement(userId, 'cold_exposure'),
   ]);
-  const contrastAvailable =
-    contrast.screening !== null && contrast.acknowledged === CONTRAST_NOTICE_VERSION;
+  const contrastAvailable = decided.contrast.kind === 'ok';
+  const cold = decided.cold;
+  const coldAcknowledged = cold.kind === 'ok';
 
   const personFor = (customisation: ResetCustomisation): ResetPersonInputs => ({
     ...person,
@@ -133,7 +128,8 @@ export async function loadResetContext(
       summary: null,
       lastSummary: last ? resetSummary(lastLogs, programLength(last.customisation)) : null,
       contrastAvailable,
-      coldAcknowledged: coldAck === COLD_NOTICE_VERSION,
+      cold,
+      coldAcknowledged,
     };
   }
 
@@ -162,6 +158,10 @@ export async function loadResetContext(
     ).filter((target) => target.component === 'hydration' || target.component === 'sleep');
   }
 
+  // A cold finish chosen earlier drops out if the health answers now rule cold out.
+  if (cold.kind === 'unavailable')
+    targets = targets.filter((target) => target.component !== 'cold');
+
   // A check-in is due once a programme week is complete and has none yet.
   const completedWeeks =
     state.kind === 'active' || state.kind === 'complete'
@@ -188,6 +188,7 @@ export async function loadResetContext(
     summary: resetSummary(logs, length),
     lastSummary: null,
     contrastAvailable,
-    coldAcknowledged: coldAck !== null,
+    cold,
+    coldAcknowledged,
   };
 }

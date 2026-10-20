@@ -426,6 +426,20 @@ export function createMemoryNutrition(
       };
     },
 
+    forgetFood(userId: string) {
+      const mine = users.get(userId);
+      if (!mine) return;
+      mine.foods = [];
+      mine.entries = [];
+      mine.water = [];
+      mine.oil = null;
+      mine.tokens.clear();
+    },
+
+    forgetWeights(userId: string) {
+      users.get(userId)?.weights.clear();
+    },
+
     deleteNutrition(userId: string) {
       users.delete(userId);
     },

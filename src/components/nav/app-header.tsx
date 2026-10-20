@@ -6,7 +6,7 @@ import { CommandLauncher } from './command-launcher';
 export function AppHeader() {
   return (
     <header className="pt-safe px-safe sticky top-0 z-30 border-b border-line bg-canvas/90 pb-3 backdrop-blur">
-      <div className="mx-auto flex max-w-md items-center justify-between gap-3 md:max-w-2xl">
+      <div className="mx-auto flex max-w-md flex-wrap items-center justify-between gap-3 md:max-w-2xl">
         <Link
           href="/today"
           className="flex items-center gap-2 rounded-sm text-ink"
@@ -22,7 +22,7 @@ export function AppHeader() {
           <CommandLauncher />
           <Link
             href="/settings"
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-line-strong text-body-sm text-ink-muted hover:text-ink"
+            className="flex h-11 min-w-11 items-center justify-center rounded-full border border-line-strong px-2 text-body-sm text-ink-muted hover:text-ink"
             aria-label="Profile and settings"
           >
             <span aria-hidden="true">You</span>

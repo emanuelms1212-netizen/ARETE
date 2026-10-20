@@ -6,6 +6,7 @@ import {
   ChoiceList,
   FormField,
   SegmentedControl,
+  StopGuidance,
   Switch,
   TextInput,
 } from '@/components/ui';
@@ -103,6 +104,8 @@ export interface CustomiseFormProps {
   readonly initial: ResetCustomisation;
   readonly person: ResetPersonInputs;
   readonly coldAcknowledged: boolean;
+  /** Set when the central rules rule cold out: the reason, shown instead of the switch. */
+  readonly coldUnavailable?: string | null;
   readonly submitLabel: string;
   readonly pending: boolean;
   /** Before the start only: the dates on offer. */
@@ -146,7 +149,12 @@ export function CustomiseForm(props: CustomiseFormProps) {
     )
       parsedRanges[key as ResetComponent] = { min, max };
   }
-  const preview: ResetCustomisation = { ...draft, ranges: parsedRanges };
+  const preview: ResetCustomisation = {
+    ...draft,
+    ranges: parsedRanges,
+    // Cold the rules now rule out is never sent back as switched on.
+    enabled: props.coldUnavailable ? { ...draft.enabled, cold: false } : draft.enabled,
+  };
 
   function submit() {
     for (const [key, value] of Object.entries(ranges)) {
@@ -158,7 +166,7 @@ export function CustomiseForm(props: CustomiseFormProps) {
         return;
       }
     }
-    if (enabled('cold') && !coldRead) {
+    if (enabled('cold') && !props.coldUnavailable && !coldRead) {
       setError('Read the cold-water note before turning that on.');
       return;
     }
@@ -172,23 +180,35 @@ export function CustomiseForm(props: CustomiseFormProps) {
         <legend className="mb-1 text-body-sm font-medium text-ink">
           What the programme includes
         </legend>
-        {RESET_COMPONENTS.filter((component) => component !== 'weekly' && component !== 'wake').map(
-          (component) => (
-            <Switch
-              key={component}
-              label={RESET_COMPONENT_LABEL[component]}
-              {...(RESET_OPT_IN.includes(component) ? { hint: 'Off unless you choose it.' } : {})}
-              checked={enabled(component)}
-              onChange={(on) => toggle(component, on)}
-            />
-          ),
-        )}
+        {RESET_COMPONENTS.filter(
+          (component) =>
+            component !== 'weekly' &&
+            component !== 'wake' &&
+            !(component === 'cold' && props.coldUnavailable),
+        ).map((component) => (
+          <Switch
+            key={component}
+            label={RESET_COMPONENT_LABEL[component]}
+            {...(RESET_OPT_IN.includes(component) ? { hint: 'Off unless you choose it.' } : {})}
+            checked={enabled(component)}
+            onChange={(on) => toggle(component, on)}
+          />
+        ))}
+        {props.coldUnavailable ? (
+          <p className="rounded-md border border-line p-3 text-body-sm text-ink-muted">
+            <span className="block font-medium text-ink">Cool finish to a shower: not offered</span>
+            {props.coldUnavailable}
+          </p>
+        ) : null}
       </fieldset>
 
-      {enabled('cold') ? (
+      {enabled('cold') && !props.coldUnavailable ? (
         <div className="rounded-md border border-line p-3 text-body-sm">
           <p className="font-medium text-ink">Before a cold finish</p>
           <p className="mt-1 text-ink-muted">{COLD_NOTICE}</p>
+          <div className="mt-2">
+            <StopGuidance module="cold" summary="When to stop" />
+          </div>
           {coldRead ? (
             <p className="mt-2 text-ink">Read and acknowledged.</p>
           ) : (
@@ -286,7 +306,10 @@ export function CustomiseForm(props: CustomiseFormProps) {
         </p>
         <div className="mt-2 space-y-2">
           {RANGED.filter(enabled).map((component) => (
-            <div key={component} className="grid grid-cols-[1fr_5rem_5rem] items-end gap-2">
+            <div
+              key={component}
+              className="grid grid-cols-[minmax(0,1fr)_minmax(0,5rem)_minmax(0,5rem)] items-end gap-2"
+            >
               <span className="pb-3 text-body-sm text-ink">
                 {RESET_COMPONENT_LABEL[component]} ({UNIT[component]})
               </span>

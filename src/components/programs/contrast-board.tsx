@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import {
   Button,
@@ -54,6 +55,7 @@ export interface ContrastBoardProps {
   readonly screening: ContrastScreening | null;
   readonly eligibility: ContrastEligibility;
   readonly minor: boolean;
+  readonly offered: boolean;
   readonly hints: Partial<Record<ContrastQuestionId, boolean>>;
   readonly sessions: readonly ContrastSessionRecord[];
   readonly actions: ContrastActions;
@@ -507,6 +509,24 @@ export function ContrastBoard(props: ContrastBoardProps) {
         title="Not offered under 18"
         body="Contrast therapy carries real risk and is not offered to anyone under 18."
       />
+    );
+  }
+
+  if (!props.offered && props.eligibility.kind === 'refused') {
+    return (
+      <div className="space-y-3">
+        <EmptyState title="Not offered with your current answers" body={props.eligibility.reason} />
+        <p className="text-body-sm text-ink-muted">
+          If a clinician has since told you heat and cold are fine for you, you can{' '}
+          <Link
+            href="/onboarding/health?from=safety"
+            className="text-accent underline underline-offset-2"
+          >
+            change your health answers
+          </Link>
+          .
+        </p>
+      </div>
     );
   }
 

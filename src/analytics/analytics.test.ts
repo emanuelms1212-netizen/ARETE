@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { analyticsEventSchemas } from './events';
+import { ANALYTICS_MODULES, ANALYTICS_REMINDER_KINDS, analyticsEventSchemas } from './events';
 import { getAnalyticsSink, noopSink, setAnalyticsSink, track } from './client';
 
 describe('analytics', () => {
@@ -43,5 +43,26 @@ describe('analytics', () => {
         expect(banned.test(key), `${name}.${key} looks like free text`).toBe(false);
       }
     }
+  });
+
+  it('carries no journal, food, injury or religious data, even by name', () => {
+    const names = Object.keys(analyticsEventSchemas).join(' ');
+    expect(names).not.toMatch(/food|meal|weight|injur|pain|health|pregnan|journal|sacred|relig/i);
+    expect(ANALYTICS_MODULES as readonly string[]).not.toContain('sacred');
+    expect(ANALYTICS_REMINDER_KINDS as readonly string[]).not.toContain('sacred');
+    expect(analyticsEventSchemas.notification_muted.safeParse({ kind: 'sacred' }).success).toBe(
+      false,
+    );
+    expect(
+      analyticsEventSchemas.module_enabled.safeParse({ moduleId: 'contrast_therapy' }).success,
+    ).toBe(false);
+  });
+
+  it('strips fields an event does not define before anything reaches the sink', () => {
+    const record = vi.fn();
+    setAnalyticsSink({ name: 'test', record });
+    // @ts-expect-error an extra field is not part of the event
+    track('data_exported', { note: 'my private words' });
+    expect(record).toHaveBeenCalledWith('data_exported', {});
   });
 });

@@ -79,6 +79,18 @@ export function createMemoryMind() {
   }
 
   return {
+    /** Deletion helpers for the repository; not part of the repository interface. */
+    admin: {
+      forgetSessions(userId: string) {
+        sessions.delete(userId);
+        for (const key of [...tokens.keys()]) if (key.startsWith(`${userId}::`)) tokens.delete(key);
+      },
+      forgetEverything(userId: string) {
+        this.forgetSessions(userId);
+        chosenPacks.delete(userId);
+      },
+    },
+
     async listMindPractices(userId: string, kind?: MindKind): Promise<readonly MindPractice[]> {
       const chosen = packsFor(userId);
       return ALL_PRACTICES.filter(

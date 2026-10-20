@@ -1,8 +1,11 @@
 import {
+  AUDIT_DETAIL_PATTERN,
+  DATA_FEATURES,
   ONBOARDING_STEPS,
   onboardingProfileSchema,
   parseStepAnswers,
   type AnswerableStep,
+  type AuditAction,
   type Commitment,
   type Day,
   type DayMark,
@@ -12,6 +15,7 @@ import {
   type OnboardingStep,
 } from '@/domain';
 import {
+  InvalidWriteError,
   RecordNotFoundError,
   type AccountExport,
   type AreteRepository,
@@ -702,6 +706,34 @@ export function createSqlRepository(executor: SqlExecutor): AreteRepository {
 
     async deleteEverything() {
       await executor.query(`select public.delete_my_account()`);
+    },
+
+    async deleteFeatureData(_userId, feature) {
+      if (!(DATA_FEATURES as readonly string[]).includes(feature))
+        throw new InvalidWriteError(`Unknown feature: ${feature}`);
+      await executor.query(`select public.delete_my_feature($1)`, [feature]);
+    },
+
+    async recordAudit(userId, event) {
+      if (event.detail !== null && !AUDIT_DETAIL_PATTERN.test(event.detail))
+        throw new InvalidWriteError('Audit details are short machine words, never free text.');
+      await executor.query(
+        `insert into public.audit_events (user_id, action, detail) values ($1, $2, $3)`,
+        [userId, event.action, event.detail],
+      );
+    },
+
+    async listAuditEvents(userId, limit) {
+      const rows = await executor.query<{ action: AuditAction; detail: string | null; at: string }>(
+        `select action, detail, created_at as at from public.audit_events
+          where user_id = $1 order by created_at desc, seq desc limit $2`,
+        [userId, Math.max(0, Math.min(200, limit))],
+      );
+      return rows.rows.map((row) => ({
+        action: row.action,
+        detail: row.detail,
+        at: new Date(row.at).toISOString(),
+      }));
     },
   };
 }

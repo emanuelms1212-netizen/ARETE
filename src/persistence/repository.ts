@@ -1,4 +1,7 @@
 import type {
+  AuditAction,
+  AuditEvent,
+  DataFeature,
   AnswerableStep,
   Day,
   DayMark,
@@ -1048,6 +1051,15 @@ export interface AccountRepository {
   exportEverything(userId: string): Promise<AccountExport>;
   /** Irreversible. */
   deleteEverything(userId: string): Promise<void>;
+  /** Irreversible: one part of the account (see domain/data-features.ts), the rest untouched. */
+  deleteFeatureData(userId: string, feature: DataFeature): Promise<void>;
+  /** Appends to the audit trail. Records what happened, never what was in it. */
+  recordAudit(
+    userId: string,
+    event: { readonly action: AuditAction; readonly detail: string | null },
+  ): Promise<void>;
+  /** Newest first. */
+  listAuditEvents(userId: string, limit: number): Promise<readonly AuditEvent[]>;
 }
 
 export interface AreteRepository

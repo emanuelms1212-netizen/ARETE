@@ -151,6 +151,75 @@ describe('row-level security', () => {
 
     expect(without.map((row) => row.tablename)).toEqual([]);
   });
+
+  it('lists every table with an owner in user_owned_tables(), so export and delete reach it', async () => {
+    await database.asOwner();
+    const owned = await rows<{ table_name: string }>(
+      `select distinct c.table_name
+         from information_schema.columns c
+         join information_schema.tables t
+           on t.table_schema = c.table_schema and t.table_name = c.table_name
+        where c.table_schema = 'public' and c.column_name = 'user_id'
+          and t.table_type = 'BASE TABLE'
+        order by 1`,
+    );
+    const listed = (
+      await rows<{ tables: string[] }>(`select public.user_owned_tables() as tables`)
+    )[0]!.tables;
+    const missing = owned.map((row) => row.table_name).filter((name) => !listed.includes(name));
+    expect(missing).toEqual([]);
+
+    const existing = await rows<{ tablename: string }>(
+      `select tablename from pg_tables where schemaname = 'public'`,
+    );
+    const names = new Set(existing.map((row) => row.tablename));
+    expect(listed.filter((name) => !names.has(name))).toEqual([]);
+  });
+
+  it('scopes every owned table to the signed-in user in its policies', async () => {
+    await database.asOwner();
+    const unscoped = await rows<{ tablename: string }>(
+      `select c.table_name as tablename
+         from information_schema.columns c
+        where c.table_schema = 'public' and c.column_name = 'user_id'
+          and exists (select 1 from pg_tables t where t.schemaname = 'public' and t.tablename = c.table_name)
+          and not exists (
+            select 1 from pg_policies p
+             where p.schemaname = 'public' and p.tablename = c.table_name
+               and (coalesce(p.qual, '') || coalesce(p.with_check, '')) like '%current_user_id()%'
+          )`,
+    );
+    expect(unscoped.map((row) => row.tablename)).toEqual([]);
+  });
+
+  it('keeps the audit trail append-only for its owner', async () => {
+    await database.asUser(USER_A);
+    await database.db.query(
+      `insert into public.audit_events (user_id, action) values ($1, 'export')`,
+      [USER_A],
+    );
+    // Not granted at all, so the attempt fails rather than silently matching nothing.
+    await expect(
+      database.db.query(`update public.audit_events set action = 'delete_feature'`),
+    ).rejects.toThrow(/permission denied/);
+    await expect(database.db.query(`delete from public.audit_events`)).rejects.toThrow(
+      /permission denied/,
+    );
+    const after = await rows<{ action: string }>(`select action from public.audit_events`);
+    expect(after.map((row) => row.action)).toEqual(['export']);
+    await expect(
+      database.db.query(`insert into public.audit_events (user_id, action) values ($1, 'export')`, [
+        USER_B,
+      ]),
+    ).rejects.toThrow();
+    await expect(
+      database.db.query(
+        `insert into public.audit_events (user_id, action, detail) values ($1, 'export', 'free text here')`,
+        [USER_A],
+      ),
+    ).rejects.toThrow();
+    await database.asOwner();
+  });
 });
 
 describe("one user cannot reach another user's data", () => {

@@ -207,8 +207,44 @@ export function createMemoryDailySystem(access: DayAccess) {
     }
   }
 
+  const mine = (key: string, userId: string) => key.startsWith(`${userId}::`);
+
   return {
     seed,
+
+    /** Deletion helpers for the repository; not part of the repository interface. */
+    admin: {
+      /** The journal's daily pages: framing words and evening reviews. Switches stay. */
+      forgetJournal(userId: string) {
+        for (const [key, framing] of [...framings.entries()]) {
+          if (!mine(key, userId)) continue;
+          framings.set(key, {
+            ...framing,
+            intention: null,
+            inMyControl: null,
+            notMyControl: null,
+            virtue: null,
+            obstacle: null,
+          });
+        }
+        for (const key of [...reviews.keys()]) if (mine(key, userId)) reviews.delete(key);
+      },
+      forgetFocus(userId: string) {
+        const running = focus.get(userId);
+        if (running) focusStarts.delete(running.id);
+        focus.delete(userId);
+        for (const key of [...focusTokens.keys()]) if (mine(key, userId)) focusTokens.delete(key);
+      },
+      forgetEverything(userId: string) {
+        this.forgetFocus(userId);
+        goals.delete(userId);
+        tasks.delete(userId);
+        habits.delete(userId);
+        habitLogs.delete(userId);
+        for (const key of [...framings.keys()]) if (mine(key, userId)) framings.delete(key);
+        for (const key of [...reviews.keys()]) if (mine(key, userId)) reviews.delete(key);
+      },
+    },
 
     // -----------------------------------------------------------------------
     // Goals

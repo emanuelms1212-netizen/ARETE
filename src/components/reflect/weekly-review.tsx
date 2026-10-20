@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Button, FormField, Section, TextArea, useToast } from '@/components/ui';
+import { Button, FormField, Section, StopGuidance, TextArea, useToast } from '@/components/ui';
 import { WEEKLY_PROMPTS, type WeeklyPromptKey } from '@/domain';
 
 type Result<T> = { ok: true; value: T } | { ok: false; message: string };
@@ -68,6 +68,9 @@ export function WeeklyReviewForm({
           Save the review
         </Button>
       </form>
+      <div className="mt-4">
+        <StopGuidance module="journal" summary="If writing brings up something heavy" />
+      </div>
     </Section>
   );
 }

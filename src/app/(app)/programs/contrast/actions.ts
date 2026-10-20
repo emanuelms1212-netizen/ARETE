@@ -59,11 +59,18 @@ export async function saveScreeningAction(input: {
   return run(async (repository, { userId }, context) => {
     if (context.minor)
       return { ok: false, message: 'Contrast therapy is not offered to anyone under 18.' };
+    if (!context.offered && context.eligibility.kind === 'refused')
+      return { ok: false, message: context.eligibility.reason };
     const saved = await repository.saveContrastScreening(userId, parsed.data);
     await repository.acknowledgeSafety(userId, {
       topic: 'contrast_therapy',
       version: CONTRAST_NOTICE_VERSION,
       at: new Date(),
+    });
+    await repository.recordAudit(userId, { action: 'contrast_screening_saved', detail: null });
+    await repository.recordAudit(userId, {
+      action: 'safety_acknowledged',
+      detail: 'contrast_therapy',
     });
     return { ok: true, value: saved };
   });

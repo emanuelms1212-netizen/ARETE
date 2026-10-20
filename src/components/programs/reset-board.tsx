@@ -82,6 +82,7 @@ export interface ResetBoardProps {
   readonly lastSummary: ResetSummary | null;
   readonly contrastAvailable: boolean;
   readonly coldAcknowledged: boolean;
+  readonly coldUnavailable: string | null;
   readonly actions: ResetActions;
 }
 
@@ -166,6 +167,7 @@ function Setup(props: ResetBoardProps) {
           initial={props.defaults}
           person={props.person}
           coldAcknowledged={props.coldAcknowledged}
+          coldUnavailable={props.coldUnavailable}
           submitLabel="Start the programme"
           pending={pending}
           startDates={dates}
@@ -217,7 +219,7 @@ function TodayItems({
                   <p className="text-body-sm text-ink-muted">{target.why}</p>
                   {target.component === 'weekly' ? (
                     <p className="text-body-sm">
-                      <Link href="/reflect" className="text-accent hover:underline">
+                      <Link href="/reflect" className="text-accent underline underline-offset-2">
                         Open the weekly review
                       </Link>
                     </p>
@@ -575,7 +577,7 @@ function Running(props: ResetBoardProps & { enrolment: ResetEnrolment; state: Re
       {props.contrastAvailable && state.kind === 'active' ? (
         <p className="text-body-sm text-ink-muted">
           Optional, and not part of the reset:{' '}
-          <Link href="/programs/contrast" className="text-accent hover:underline">
+          <Link href="/programs/contrast" className="text-accent underline underline-offset-2">
             a contrast session
           </Link>{' '}
           on a recovery day.
@@ -592,6 +594,7 @@ function Running(props: ResetBoardProps & { enrolment: ResetEnrolment; state: Re
             initial={enrolment.customisation}
             person={props.person}
             coldAcknowledged={props.coldAcknowledged}
+            coldUnavailable={props.coldUnavailable}
             submitLabel="Save changes"
             pending={pending}
             lockExtension={

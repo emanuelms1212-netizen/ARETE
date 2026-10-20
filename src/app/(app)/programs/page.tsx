@@ -47,11 +47,13 @@ export default async function ProgramsPage() {
             : 'Starts soon';
   const contrastLine = data.contrast.minor
     ? 'Not offered under 18'
-    : data.contrast.eligibility.kind === 'ok'
-      ? 'Set up. Optional on recovery days.'
-      : data.contrast.eligibility.kind === 'needs_clearance'
-        ? 'Waiting on a doctor’s clearance'
-        : 'Off. Screening first.';
+    : !data.contrast.offered
+      ? 'Not offered with your health answers'
+      : data.contrast.eligibility.kind === 'ok'
+        ? 'Set up. Optional on recovery days.'
+        : data.contrast.eligibility.kind === 'needs_clearance'
+          ? 'Waiting on a doctor’s clearance'
+          : 'Off. Screening first.';
 
   return (
     <div className="space-y-4">
